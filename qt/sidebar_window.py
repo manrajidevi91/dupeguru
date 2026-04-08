@@ -24,6 +24,8 @@ from PyQt5.QtWidgets import (
     QLabel,
     QFrame,
     QSpacerItem,
+    QFileDialog,
+    QApplication,
 )
 from PyQt5.QtGui import QFont
 
@@ -100,6 +102,7 @@ class SidebarWindow(QMainWindow):
         self.navigation_rail.modeChanged.connect(self._on_mode_changed)
         self.navigation_rail.addFolderClicked.connect(self._on_add_folder_clicked)
         self.navigation_rail.removeFolderClicked.connect(self._on_remove_folder_clicked)
+        self.navigation_rail.changeFolderClicked.connect(self._on_change_folder_clicked)
         self.navigation_rail.startScanClicked.connect(self._on_start_scan_clicked)
         self.navigation_rail.scanTypeChanged.connect(self._on_scan_type_changed)
         self.navigation_rail.thresholdChanged.connect(self._on_threshold_changed)
@@ -188,16 +191,37 @@ class SidebarWindow(QMainWindow):
         self.navigation_rail.update_scan_types(scan_type_labels, current_type_idx)
 
     def _on_add_folder_clicked(self):
-        self.app.actionAddDirectory.trigger()
-        self._update_sidebar_folders()
+        flags = QFileDialog.ShowDirsOnly
+        parent = QApplication.activeWindow()
+        directory = QFileDialog.getExistingDirectory(parent, tr("Select Directory"), "", flags)
+        if directory:
+            self.app.model.add_directory(directory)
+            self._update_sidebar_folders()
 
     def _on_remove_folder_clicked(self, path):
-        # Find directory object by path and remove it
-        for folder in self.app.model.directories:
-            if str(folder.path) == path:
-                self.app.model.remove_directory(folder)
+        # Use index-based deletion as Directories doesn't have remove_directory
+        dirs = self.app.model.directories
+        for i in range(len(dirs)):
+            if str(dirs[i]) == path:
+                del dirs[i]
+                self.app.model.notify("directories_changed")
                 break
         self._update_sidebar_folders()
+
+    def _on_change_folder_clicked(self, old_path):
+        flags = QFileDialog.ShowDirsOnly
+        parent = QApplication.activeWindow()
+        new_directory = QFileDialog.getExistingDirectory(parent, tr("Select Directory"), old_path, flags)
+        if new_directory:
+            # First remove the old one (using index-based deletion)
+            dirs = self.app.model.directories
+            for i in range(len(dirs)):
+                if str(dirs[i]) == old_path:
+                    del dirs[i]
+                    break
+            # Then add the new one
+            self.app.model.add_directory(new_directory)
+            self._update_sidebar_folders()
 
     def _on_start_scan_clicked(self):
         self.app.actionStartScanning.trigger()

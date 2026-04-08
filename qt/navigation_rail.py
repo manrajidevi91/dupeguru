@@ -28,6 +28,7 @@ tr = trget("ui")
 class FolderItemWidget(QWidget):
     """Custom widget for folder items in the sidebar list."""
     removeClicked = pyqtSignal(str)  # Folder path
+    changeClicked = pyqtSignal(str)  # Folder path
     
     def __init__(self, folder_path, parent=None):
         super().__init__(parent)
@@ -49,11 +50,19 @@ class FolderItemWidget(QWidget):
         self.path_label = QLabel(self.folder_path)
         self.path_label.setStyleSheet("font-size: 12px; color: #d1d5db;")
         self.path_label.setToolTip(self.folder_path)
+        self.path_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        self.path_label.setMinimumWidth(0)
         layout.addWidget(self.path_label)
         
-        layout.addStretch()
+        # Change button
+        self.change_btn = QToolButton()
+        self.change_btn.setText("Edit")
+        self.change_btn.setObjectName("ChangeFolderBtn")
+        self.change_btn.setCursor(Qt.PointingHandCursor)
+        self.change_btn.clicked.connect(lambda: self.changeClicked.emit(self.folder_path))
+        layout.addWidget(self.change_btn)
         
-        # Remove button (hidden by default)
+        # Remove button
         self.remove_btn = QToolButton()
         self.remove_btn.setText("×")
         self.remove_btn.setFixedSize(20, 20)
@@ -72,16 +81,8 @@ class FolderItemWidget(QWidget):
             }
         """)
         self.remove_btn.clicked.connect(lambda: self.removeClicked.emit(self.folder_path))
-        self.remove_btn.hide()
         layout.addWidget(self.remove_btn)
 
-    def enterEvent(self, event):
-        self.remove_btn.show()
-        super().enterEvent(event)
-        
-    def leaveEvent(self, event):
-        self.remove_btn.hide()
-        super().leaveEvent(event)
 
 
 class NavigationRail(QWidget):
@@ -91,6 +92,7 @@ class NavigationRail(QWidget):
     startScanClicked = pyqtSignal()
     addFolderClicked = pyqtSignal()
     removeFolderClicked = pyqtSignal(str)
+    changeFolderClicked = pyqtSignal(str)
     scanTypeChanged = pyqtSignal(int)
     thresholdChanged = pyqtSignal(int)
     
@@ -265,6 +267,7 @@ class NavigationRail(QWidget):
         for path in folder_paths:
             widget = FolderItemWidget(path)
             widget.removeClicked.connect(self.removeFolderClicked.emit)
+            widget.changeClicked.connect(self.changeFolderClicked.emit)
             self.folder_list_layout.addWidget(widget)
 
     def update_scan_types(self, type_list, current_index=0):

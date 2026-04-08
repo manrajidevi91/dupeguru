@@ -314,6 +314,20 @@ QWidget#FolderItem:hover {{
     text-decoration: underline;
 }}
 
+#NavigationRail QToolButton#ChangeFolderBtn {{
+    background: rgba(163, 201, 255, 26);
+    color: {self._qcolor_to_css(palette['primary'])};
+    border: 1px solid {self._qcolor_to_css(palette['primary'])};
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: bold;
+}}
+
+#NavigationRail QToolButton#ChangeFolderBtn:hover {{
+    background: rgba(163, 201, 255, 51);
+}}
+
 /* START SCAN Button */
 QWidget#StartScanContainer {{
     border-top: 1px solid {self._qcolor_to_css(palette['indented_line'])};
@@ -364,7 +378,22 @@ QComboBox {{
 
 QComboBox::drop-down {{
     border: none;
-    width: 24px;
+    width: 32px;
+}}
+
+QComboBox::down-arrow {{
+    image: none;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid {self._qcolor_to_css(palette['outline'])};
+    width: 0;
+    height: 0;
+    margin-right: 12px;
+}}
+
+QComboBox::down-arrow:on {{
+    border-top: none;
+    border-bottom: 5px solid {self._qcolor_to_css(palette['primary'])};
 }}
 
 QComboBox QAbstractItemView {{
@@ -372,6 +401,8 @@ QComboBox QAbstractItemView {{
     border: 1px solid {self._qcolor_to_css(palette['outline_variant'])};
     selection-background-color: {self._qcolor_to_css(palette['primary'])};
     outline: none;
+    border-radius: 8px;
+    margin-top: 4px;
 }}
 
 QSlider::groove:horizontal {{
