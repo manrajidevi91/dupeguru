@@ -18,8 +18,11 @@ from qt.about_box import AboutBox
 from qt.recent import Recent
 from qt.util import create_actions
 from qt.progress_window import ProgressWindow
+from qt.dashboard import Dashboard
+from qt.preset_dialog import PresetDialog
 
 from core.app import AppMode, DupeGuru as DupeGuruModel
+from core.presets import PresetManager
 import core.pe.photo
 from qt import platform
 from qt.preferences import Preferences
@@ -37,6 +40,8 @@ from qt.me.preferences_dialog import PreferencesDialog as PreferencesDialogMusic
 from qt.pe.preferences_dialog import PreferencesDialog as PreferencesDialogPicture
 from qt.pe.photo import File as PlatSpecificPhoto
 from qt.tabbed_window import TabBarWindow, TabWindow
+from qt.sidebar_window import SidebarWindow
+from qt.theme_manager import ThemeManager
 
 tr = trget("ui")
 
@@ -53,6 +58,12 @@ class DupeGuru(QObject):
         # Could be passed as an argument to this class if we wanted
         self.use_tabs = True
         self.model = DupeGuruModel(view=self, portable=self.prefs.portable)
+        # Initialize preset manager
+        self.preset_manager = PresetManager()
+        # Initialize theme manager
+        self.theme_manager = ThemeManager(QApplication.instance())
+        # Apply theme from preferences
+        self.theme_manager.set_theme(self.prefs.theme_mode)
         self._setup()
 
     # --- Private
@@ -63,28 +74,39 @@ class DupeGuru(QObject):
         self._update_options()
         self.recentResults = Recent(self, "recentResults")
         self.recentResults.mustOpenItem.connect(self.model.load_from)
+        self.recentResults.itemsChanged.connect(self._on_recent_results_changed)
         self.resultWindow = None
         if self.use_tabs:
-            self.main_window = TabBarWindow(self) if not self.prefs.tabs_default_pos else TabWindow(self)
+            # Use modern SidebarWindow as the default main window
+            self.main_window = SidebarWindow(self)
             parent_window = self.main_window
-            self.directories_dialog = self.main_window.createPage("DirectoriesDialog", app=self)
-            self.main_window.addTab(self.directories_dialog, tr("Directories"), switch=False)
-            self.actionDirectoriesWindow.setEnabled(False)
+            # Create dashboard as the main landing page
+            self.dashboard = self.main_window.create_page("Dashboard", app=self)
+            # Keep directories dialog accessible
+            self.directories_dialog = self.main_window.create_page("DirectoriesDialog", app=self)
+            self.actionDirectoriesWindow.setEnabled(True)
         else:  # floating windows only
             self.main_window = None
+            # Dashboard becomes main window
+            self.dashboard = Dashboard(self)
+            self.dashboard.setWindowTitle(self.NAME)
+            parent_window = self.dashboard
+            # Directories dialog is separate but accessible
             self.directories_dialog = DirectoriesDialog(self)
-            parent_window = self.directories_dialog
+
+        # Wire up dashboard signals
+        self._setup_dashboard_connections()
 
         self.progress_window = ProgressWindow(parent_window, self.model.progress_window)
         self.problemDialog = ProblemDialog(parent=parent_window, model=self.model.problem_dialog)
         if self.use_tabs:
-            self.ignoreListDialog = self.main_window.createPage(
+            self.ignoreListDialog = self.main_window.create_page(
                 "IgnoreListDialog",
-                parent=self.main_window,
+                app=self,
                 model=self.model.ignore_list_dialog,
             )
 
-            self.excludeListDialog = self.main_window.createPage(
+            self.excludeListDialog = self.main_window.create_page(
                 "ExcludeListDialog",
                 app=self,
                 parent=self.main_window,
@@ -199,8 +221,6 @@ class DupeGuru(QObject):
         if self.details_dialog:
             self.details_dialog.update_options()
 
-        self._set_style("dark" if self.prefs.use_dark_style else "light")
-
     # --- Private
     def _get_details_dialog_class(self):
         if self.model.app_mode == AppMode.PICTURE:
@@ -217,39 +237,6 @@ class DupeGuru(QObject):
             return PreferencesDialogMusic
         else:
             return PreferencesDialogStandard
-
-    def _set_style(self, style="light"):
-        # Only support this feature on windows for now
-        if not plat.ISWINDOWS:
-            return
-        if style == "dark":
-            QApplication.setStyle(QStyleFactory.create("Fusion"))
-            palette = QApplication.style().standardPalette()
-            palette.setColor(QPalette.ColorRole.Window, QColor(53, 53, 53))
-            palette.setColor(QPalette.ColorRole.WindowText, Qt.white)
-            palette.setColor(QPalette.ColorRole.Base, QColor(25, 25, 25))
-            palette.setColor(QPalette.ColorRole.AlternateBase, QColor(53, 53, 53))
-            palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(53, 53, 53))
-            palette.setColor(QPalette.ColorRole.ToolTipText, Qt.white)
-            palette.setColor(QPalette.ColorRole.Text, Qt.white)
-            palette.setColor(QPalette.ColorRole.Button, QColor(53, 53, 53))
-            palette.setColor(QPalette.ColorRole.ButtonText, Qt.white)
-            palette.setColor(QPalette.ColorRole.BrightText, Qt.red)
-            palette.setColor(QPalette.ColorRole.Link, QColor(42, 130, 218))
-            palette.setColor(QPalette.ColorRole.Highlight, QColor(42, 130, 218))
-            palette.setColor(QPalette.ColorRole.HighlightedText, Qt.black)
-            palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text, QColor(164, 166, 168))
-            palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.WindowText, QColor(164, 166, 168))
-            palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.ButtonText, QColor(164, 166, 168))
-            palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.HighlightedText, QColor(164, 166, 168))
-            palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Base, QColor(68, 68, 68))
-            palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Window, QColor(68, 68, 68))
-            palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Highlight, QColor(68, 68, 68))
-        else:
-            QApplication.setStyle(QStyleFactory.create("windowsvista" if plat.ISWINDOWS else "Fusion"))
-            palette = QApplication.style().standardPalette()
-        QToolTip.setPalette(palette)
-        QApplication.setPalette(palette)
 
     # --- Public
     def add_selected_to_ignore_list(self):
@@ -277,17 +264,17 @@ class DupeGuru(QObject):
     def showResultsWindow(self):
         if self.resultWindow is not None:
             if self.use_tabs:
-                if self.main_window.indexOfWidget(self.resultWindow) < 0:
-                    self.main_window.addTab(self.resultWindow, tr("Results"), switch=True)
-                    return
-                self.main_window.showTab(self.resultWindow)
+                if self.main_window.index_of_widget(self.resultWindow) < 0:
+                    # Create results window if not exists
+                    self.create_results_window()
+                self.main_window.navigate_to("ResultWindow")
             else:
                 self.resultWindow.show()
 
     def showDirectoriesWindow(self):
         if self.directories_dialog is not None:
             if self.use_tabs:
-                self.main_window.showTab(self.directories_dialog)
+                self.main_window.navigate_to("DirectoriesDialog")
             else:
                 self.directories_dialog.show()
 
@@ -337,24 +324,15 @@ class DupeGuru(QObject):
 
     def ignoreListTriggered(self):
         if self.use_tabs:
-            self.showTriggeredTabbedDialog(self.ignoreListDialog, tr("Ignore List"))
+            self.main_window.navigate_to("IgnoreListDialog")
         else:  # floating windows
             self.model.ignore_list_dialog.show()
 
     def excludeListTriggered(self):
         if self.use_tabs:
-            self.showTriggeredTabbedDialog(self.excludeListDialog, tr("Exclusion Filters"))
+            self.main_window.navigate_to("ExcludeListDialog")
         else:  # floating windows
             self.model.exclude_list_dialog.show()
-
-    def showTriggeredTabbedDialog(self, dialog, desc_string):
-        """Add tab for dialog, name the tab with desc_string, then show it."""
-        index = self.main_window.indexOfWidget(dialog)
-        # Create the tab if it doesn't exist already
-        if index < 0:  # or (not dialog.isVisible() and not self.main_window.isTabVisible(index)):
-            index = self.main_window.addTab(dialog, desc_string, switch=True)
-        # Show the tab for that widget
-        self.main_window.setCurrentIndex(index)
 
     def openDebugLogTriggered(self):
         debug_log_path = op.join(self.model.appdata, "debug.log")
@@ -370,7 +348,17 @@ class DupeGuru(QObject):
             preferences_dialog.save()
             self.prefs.save()
             self._update_options()
+            # Apply theme if changed
+            self.theme_manager.set_theme(self.prefs.theme_mode)
         preferences_dialog.setParent(None)
+
+    def showPresetDialog(self):
+        """Show the preset management dialog."""
+        preset_dialog = PresetDialog(
+            self.main_window if self.main_window else self.directories_dialog, self
+        )
+        preset_dialog.exec()
+        preset_dialog.setParent(None)
 
     def quitTriggered(self):
         if self.details_dialog is not None:
@@ -425,7 +413,7 @@ class DupeGuru(QObject):
             # This is better for tabs, as it takes care of duplicate items in menu bar
             self.resultWindow.deleteLater() if self.use_tabs else self.resultWindow.setParent(None)
         if self.use_tabs:
-            self.resultWindow = self.main_window.createPage("ResultWindow", parent=self.main_window, app=self)
+            self.resultWindow = self.main_window.create_page("ResultWindow", parent=self.main_window, app=self)
         else:  # We don't use a tab widget, regular floating QMainWindow
             self.resultWindow = ResultWindow(self.directories_dialog, self)
             self.directories_dialog._updateActionsState()
@@ -447,3 +435,37 @@ class DupeGuru(QObject):
         if not destination.endswith(f".{extension}"):
             destination = f"{destination}.{extension}"
         return destination
+
+    # --- Dashboard Integration
+    def _setup_dashboard_connections(self):
+        """Wire up dashboard signals to app handlers."""
+        if getattr(self, 'dashboard', None) is not None:
+            self.dashboard.startScanRequested.connect(self._on_dashboard_start_scan)
+            self.dashboard.loadResultsRequested.connect(self._on_dashboard_load_results)
+            self.dashboard.showDirectoriesRequested.connect(self.showDirectoriesWindow)
+            self.dashboard.showPreferencesRequested.connect(self.preferencesTriggered)
+            self.dashboard.foldersDropped.connect(self._on_dashboard_folders_dropped)
+            self.dashboard.showPresetsRequested.connect(self.showPresetDialog)
+
+    def _on_recent_results_changed(self):
+        """Handle changes to recent results list."""
+        if getattr(self, 'dashboard', None) is not None:
+            self.dashboard.refresh_recent_scans()
+
+    def _on_dashboard_start_scan(self):
+        """Handle start scan request from dashboard."""
+        # Switch to directories dialog to configure and start scan
+        self.showDirectoriesWindow()
+
+    def _on_dashboard_load_results(self, path):
+        """Handle load results request from dashboard."""
+        if path:
+            self.model.load_from(path)
+            self.recentResults.insertItem(path)
+
+    def _on_dashboard_folders_dropped(self, folders):
+        """Handle folders dropped on dashboard."""
+        # Add folders and switch to directories dialog
+        for folder in folders:
+            self.model.add_directory(folder)
+        self.showDirectoriesWindow()

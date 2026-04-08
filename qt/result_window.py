@@ -15,12 +15,14 @@ from PyQt5.QtWidgets import (
     QMenuBar,
     QWidget,
     QVBoxLayout,
+    QHBoxLayout,
     QAbstractItemView,
     QStatusBar,
     QDialog,
     QPushButton,
     QCheckBox,
     QDesktopWidget,
+    QStackedWidget,
 )
 
 from hscommon.trans import trget
@@ -31,6 +33,8 @@ from core.app import AppMode
 from qt.results_model import ResultsView
 from qt.stats_label import StatsLabel
 from qt.prioritize_dialog import PrioritizeDialog
+from qt.card_grid_view import CardGridView
+from qt.comparison_panel import ComparisonPanel
 from qt.se.results_model import ResultsModel as ResultsModelStandard
 from qt.me.results_model import ResultsModel as ResultsModelMusic
 from qt.pe.results_model import ResultsModel as ResultsModelPicture
@@ -61,7 +65,14 @@ class ResultWindow(QMainWindow):
         self.dupesOnlyCheckBox.stateChanged.connect(self.powerMarkerTriggered)
         self.deltaValuesCheckBox.stateChanged.connect(self.deltaTriggered)
         self.searchEdit.searchChanged.connect(self.searchChanged)
+        self.viewToggleButton.clicked.connect(self.toggleViewTriggered)
+        self.cardView.actionTriggered.connect(self._on_card_action_triggered)
+        self.cardView.fileClicked.connect(self._on_file_clicked)
         self.app.willSavePrefs.connect(self.appWillSavePrefs)
+        
+        # Store current view mode (0 = table, 1 = card)
+        self.current_view_mode = 0
+        self.comparison_dialog = None
 
     def _setupActions(self):
         # (name, shortcut, icon, desc, func)
@@ -196,13 +207,27 @@ class ResultWindow(QMainWindow):
                 tr("Save Results..."),
                 self.saveResultsTriggered,
             ),
-            (
-                "actionInvokeCustomCommand",
-                "Ctrl+Alt+I",
-                "",
-                tr("Invoke Custom Command"),
-                self.app.invokeCustomCommand,
-            ),
+        (
+            "actionInvokeCustomCommand",
+            "Ctrl+Alt+I",
+            "",
+            tr("Invoke Custom Command"),
+            self.app.invokeCustomCommand,
+        ),
+        (
+            "actionToggleView",
+            "Ctrl+T",
+            "",
+            tr("Toggle View"),
+            self.toggleViewTriggered,
+        ),
+        (
+            "actionUndo",
+            "Ctrl+Z",
+            "",
+            tr("Undo"),
+            self.undoTriggered,
+        ),
         ]
         create_actions(ACTIONS, self)
         self.actionDelta.setCheckable(True)
@@ -349,6 +374,30 @@ class ResultWindow(QMainWindow):
         )
         self.horizontalLayout.setSpacing(8)
         self.verticalLayout.addLayout(self.horizontalLayout)
+        
+        # Action buttons row
+        action_buttons_layout = QHBoxLayout()
+        
+        # View toggle button
+        self.viewToggleButton = QPushButton(tr("Card View"))
+        self.viewToggleButton.setMaximumWidth(120)
+        self.viewToggleButton.setToolTip(tr("Toggle between table and card view"))
+        action_buttons_layout.addWidget(self.viewToggleButton)
+        
+        # Undo button
+        self.undoButton = QPushButton(tr("Undo"))
+        self.undoButton.setMaximumWidth(100)
+        self.undoButton.setToolTip(tr("Undo last action (Ctrl+Z)"))
+        self.undoButton.clicked.connect(self.undoTriggered)
+        action_buttons_layout.addWidget(self.undoButton)
+        
+        action_buttons_layout.addStretch()
+        self.verticalLayout.addLayout(action_buttons_layout)
+        
+        # Stacked widget for table/card views
+        self.viewStack = QStackedWidget(self.centralwidget)
+        
+        # Table view (existing)
         self.resultsView = ResultsView(self.centralwidget)
         self.resultsView.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.resultsView.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -360,7 +409,14 @@ class ResultWindow(QMainWindow):
         h.setSectionsMovable(True)
         h.setStretchLastSection(False)
         h.setDefaultAlignment(Qt.AlignLeft)
-        self.verticalLayout.addWidget(self.resultsView)
+        self.viewStack.addWidget(self.resultsView)
+        
+        # Card view (new)
+        self.cardView = CardGridView(self.app.model.results, self.centralwidget)
+        self.cardView.setVisible(False)
+        self.viewStack.addWidget(self.cardView)
+        
+        self.verticalLayout.addWidget(self.viewStack)
         self.setCentralWidget(self.centralwidget)
         self._setupActions()
         self._setupMenu()
@@ -500,6 +556,90 @@ class ResultWindow(QMainWindow):
 
     def searchChanged(self):
         self.app.model.apply_filter(self.searchEdit.text())
+
+    def toggleViewTriggered(self):
+        """Toggle between table and card view."""
+        if self.current_view_mode == 0:
+            # Switch to card view
+            self.viewStack.setCurrentWidget(self.cardView)
+            self.viewToggleButton.setText(tr("Table View"))
+            self.current_view_mode = 1
+            # Refresh card view when switching to it
+            self.cardView.refresh()
+        else:
+            # Switch to table view
+            self.viewStack.setCurrentWidget(self.resultsView)
+            self.viewToggleButton.setText(tr("Card View"))
+            self.current_view_mode = 0
+    
+    def _on_card_action_triggered(self, group, action_name):
+        """Handle quick action triggered from card view."""
+        # Get the presenter to perform the action
+        presenter = self.app.model.results.presenter
+        
+        # Get files to mark based on action
+        if action_name == "select_all_except_best":
+            files_to_mark = presenter.select_all_except_best(group)
+        elif action_name == "keep_newest":
+            files_to_mark = presenter.keep_newest(group)
+        elif action_name == "keep_oldest":
+            files_to_mark = presenter.keep_oldest(group)
+        elif action_name == "keep_highest_resolution":
+            files_to_mark = presenter.keep_highest_resolution(group)
+        elif action_name == "keep_largest":
+            files_to_mark = presenter.keep_largest(group)
+        elif action_name == "keep_smallest":
+            files_to_mark = presenter.keep_smallest(group)
+        else:
+            return
+        
+        # Mark the files
+        self.app.model.mark_multiple(files_to_mark)
+        # Refresh the card view
+        self.cardView.refresh()
+    
+    def _on_file_clicked(self, file_obj, group):
+        """Handle file click in card view to open comparison."""
+        if self.comparison_dialog is not None:
+            # Close existing dialog
+            self.comparison_dialog.close()
+            self.comparison_dialog = None
+        
+        # Get the reference file from the group
+        ref = group.ref
+        
+        # If the clicked file is the reference, pick the first duplicate
+        if file_obj == ref:
+            if len(group) > 0:
+                compare_file = group.dupes[0]
+            else:
+                return  # No duplicates to compare
+        else:
+            compare_file = ref
+        
+        # Get presenter to create metadata
+        presenter = self.app.model.results.presenter
+        file1_metadata = presenter.get_file_metadata(ref)
+        file2_metadata = presenter.get_file_metadata(compare_file)
+        
+        # Create and show comparison dialog
+        self.comparison_dialog = QDialog(self)
+        self.comparison_dialog.setWindowTitle(tr("Compare Images"))
+        self.comparison_dialog.setMinimumSize(800, 600)
+        
+        layout = QVBoxLayout(self.comparison_dialog)
+        
+        comparison_panel = ComparisonPanel(file1_metadata, file2_metadata, self.comparison_dialog)
+        comparison_panel.comparisonClosed.connect(self.comparison_dialog.close)
+        
+        layout.addWidget(comparison_panel)
+        
+        self.comparison_dialog.exec_()
+        self.comparison_dialog = None
+
+    def undoTriggered(self):
+        """Handle undo action."""
+        self.app.model.undo_last_action()
 
     def closeEvent(self, event):
         # this saves the location of the results window when it is closed

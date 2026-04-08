@@ -1,0 +1,466 @@
+# Copyright 2016 Hardcoded Software (http://www.hardcoded.net)
+#
+# This software is licensed under the "GPLv3" License as described in the "LICENSE" file,
+# which should be included with this package. The terms are also available at
+# http://www.gnu.org/licenses/gpl-3.0.html
+
+"""
+Theme Manager for dupeGuru - Centralized theme and style management.
+
+This module provides the ThemeManager class which handles:
+- Dynamic theme switching between light, dark, and auto modes
+- Color palette generation based on New_UI.html design
+- QSS stylesheet loading and application
+- System theme detection for auto mode
+"""
+
+from PyQt5.QtCore import QObject, pyqtSignal
+from PyQt5.QtGui import QPalette, QColor
+from PyQt5.QtWidgets import QApplication
+
+from hscommon import plat
+from hscommon.trans import trget
+
+tr = trget("ui")
+
+
+class ThemeManager(QObject):
+    """Centralized theme management system for dupeGuru."""
+    
+    themeChanged = pyqtSignal(str)  # Emitted when theme changes, with theme name
+    
+    THEME_DARK = "dark"
+    THEME_LIGHT = "light"
+    THEME_AUTO = "auto"
+    
+    def __init__(self, app):
+        super().__init__()
+        self.app = app
+        self.current_theme = self.THEME_LIGHT
+        self.system_dark_mode = False
+        
+        # Color palettes based on New_UI.html design
+        self.dark_palette = {
+            'background': QColor(19, 19, 19),  # #131313
+            'surface': QColor(19, 19, 19),  # #131313
+            'surface_container_low': QColor(27, 27, 28),  # #1b1b1c
+            'surface_container': QColor(32, 32, 32),  # #202020
+            'surface_container_high': QColor(42, 42, 42),  # #2a2a2a
+            'surface_container_highest': QColor(53, 53, 53),  # #353535
+            'primary': QColor(163, 201, 255),  # #a3c9ff
+            'on_primary': QColor(0, 49, 92),  # #00315c
+            'primary_container': QColor(0, 120, 212),  # #0078d4
+            'on_primary_container': QColor(255, 255, 255),  # #ffffff
+            'secondary': QColor(173, 200, 242),  # #adc8f2
+            'on_secondary': QColor(20, 49, 83),  # #143153
+            'secondary_container': QColor(45, 72, 107),  # #2d486b
+            'on_secondary_container': QColor(156, 183, 223),  # #9cb7df
+            'tertiary': QColor(255, 182, 137),  # #ffb689
+            'on_tertiary': QColor(81, 35, 0),  # #512300
+            'error': QColor(255, 180, 171),  # #ffb4ab
+            'on_error': QColor(105, 0, 5),  # #690005
+            'error_container': QColor(147, 0, 10),  # #93000a
+            'on_error_container': QColor(255, 218, 214),  # #ffdad6
+            'outline': QColor(138, 145, 158),  # #8a919e
+            'outline_variant': QColor(64, 71, 82),  # #404752
+            'on_surface': QColor(229, 226, 225),  # #e5e2e1
+            'on_surface_variant': QColor(192, 199, 212),  # #c0c7d4
+            'inverse_surface': QColor(229, 226, 225),  # #e5e2e1
+            'inverse_on_surface': QColor(48, 48, 48),  # #303030
+            'inverse_primary': QColor(0, 96, 171),  # #0060ab
+        }
+        
+        self.light_palette = {
+            'background': QColor(255, 251, 254),  # Light background
+            'surface': QColor(255, 251, 254),  # Light surface
+            'surface_container_low': QColor(239, 239, 240),  # #efefef
+            'surface_container': QColor(233, 233, 233),  # #e9e9e9
+            'surface_container_high': QColor(227, 227, 227),  # #e3e3e3
+            'surface_container_highest': QColor(221, 221, 221),  # #dddddd
+            'primary': QColor(0, 120, 212),  # Windows 11 blue
+            'on_primary': QColor(255, 255, 255),  # White text on primary
+            'primary_container': QColor(211, 227, 255),  # #d3e3ff
+            'on_primary_container': QColor(0, 28, 57),  # #001c39
+            'secondary': QColor(108, 135, 175),  # #6c87af
+            'on_secondary': QColor(255, 255, 255),  # White text
+            'secondary_container': QColor(211, 227, 255),  # Light blue
+            'on_secondary_container': QColor(0, 28, 57),  # Dark blue
+            'tertiary': QColor(188, 91, 0),  # Orange
+            'on_tertiary': QColor(255, 255, 255),  # White
+            'error': QColor(186, 26, 26),  # Red
+            'on_error': QColor(255, 255, 255),  # White
+            'error_container': QColor(255, 218, 214),  # Light red
+            'on_error_container': QColor(65, 0, 2),  # Dark red
+            'outline': QColor(119, 119, 119),  # Gray outline
+            'outline_variant': QColor(198, 198, 198),  # Light outline
+            'on_surface': QColor(28, 27, 31),  # Almost black
+            'on_surface_variant': QColor(73, 69, 79),  # Dark gray
+            'inverse_surface': QColor(49, 48, 51),  # Dark
+            'inverse_on_surface': QColor(244, 239, 244),  # Light
+            'inverse_primary': QColor(163, 201, 255),  # Light blue
+        }
+        
+    def get_current_theme(self):
+        """Get the currently active theme name."""
+        return self.current_theme
+    
+    def get_active_theme(self):
+        """Get the actual theme being used (resolves 'auto' to light or dark)."""
+        if self.current_theme == self.THEME_AUTO:
+            return self.THEME_DARK if self.system_dark_mode else self.THEME_LIGHT
+        return self.current_theme
+    
+    def set_theme(self, theme_mode):
+        """Set the application theme.
+        
+        Args:
+            theme_mode: One of 'light', 'dark', or 'auto'
+        """
+        self.current_theme = theme_mode
+        
+        # Resolve auto mode
+        active_theme = self.get_active_theme()
+        
+        # Apply theme
+        self._apply_theme(active_theme)
+        
+        # Emit signal
+        self.themeChanged.emit(active_theme)
+    
+    def update_system_theme(self):
+        """Check system theme preference and update if in auto mode."""
+        # Detect system dark mode
+        # On Windows 11+, check registry or system settings
+        if plat.ISWINDOWS:
+            try:
+                import winreg
+                registry_key = winreg.OpenKey(
+                    winreg.HKEY_CURRENT_USER,
+                    r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
+                )
+                # AppsUseLightTheme: 0 = dark mode, 1 = light mode
+                apps_use_light_theme, _ = winreg.QueryValueEx(registry_key, "AppsUseLightTheme")
+                self.system_dark_mode = apps_use_light_theme == 0
+                winreg.CloseKey(registry_key)
+            except:
+                # Default to light mode on error
+                self.system_dark_mode = False
+        else:
+            # For macOS and Linux, use simple detection
+            # This is a basic implementation - could be enhanced
+            self.system_dark_mode = False
+        
+        # If in auto mode, re-apply theme
+        if self.current_theme == self.THEME_AUTO:
+            self.set_theme(self.THEME_AUTO)
+    
+    def get_color(self, role):
+        """Get a color from the current active palette.
+        
+        Args:
+            role: Color role name (e.g., 'background', 'primary', 'on_primary')
+        
+        Returns:
+            QColor for the requested role
+        """
+        active_theme = self.get_active_theme()
+        palette = self.dark_palette if active_theme == self.THEME_DARK else self.light_palette
+        return palette.get(role, QColor(128, 128, 128))  # Default to gray if not found
+    
+    def get_qss(self):
+        """Get the QSS stylesheet for the current theme.
+        
+        Returns:
+            QSS stylesheet string
+        """
+        active_theme = self.get_active_theme()
+        return self._generate_qss(active_theme)
+    
+    def _generate_qss(self, theme):
+        """Generate QSS stylesheet for the given theme."""
+        palette = self.dark_palette if theme == self.THEME_DARK else self.light_palette
+        
+        qss = f"""
+/* Common Styles */
+QWidget {{
+    background-color: {self._qcolor_to_css(palette['background'])};
+    color: {self._qcolor_to_css(palette['on_surface'])};
+}}
+
+/* QMainWindow */
+QMainWindow {{
+    background-color: {self._qcolor_to_css(palette['surface'])};
+}}
+
+/* Sidebar / Navigation Rail */
+NavigationRail {{
+    background-color: {self._qcolor_to_css(palette['surface_container'])};
+    border-right: 1px solid {self._qcolor_to_css(palette['outline_variant'])};
+}}
+
+NavigationRail QPushButton {{
+    background-color: transparent;
+    border: none;
+    border-radius: 8px;
+    padding: 12px;
+    text-align: left;
+    color: {self._qcolor_to_css(palette['on_surface_variant'])};
+}}
+
+NavigationRail QPushButton:hover {{
+    background-color: {self._qcolor_to_css(palette['surface_container_highest'])};
+}}
+
+NavigationRail QPushButton[selected="true"] {{
+    background-color: {self._qcolor_to_css(palette['secondary_container'])};
+    color: {self._qcolor_to_css(palette['primary'])};
+    border-left: 3px solid {self._qcolor_to_css(palette['primary'])};
+}}
+
+/* QPushButton */
+QPushButton {{
+    background-color: {self._qcolor_to_css(palette['primary'])};
+    color: {self._qcolor_to_css(palette['on_primary'])};
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-weight: 600;
+}}
+
+QPushButton:hover {{
+    background-color: {self._adjust_brightness(palette['primary'], 20)};
+}}
+
+QPushButton:pressed {{
+    background-color: {self._adjust_brightness(palette['primary'], -20)};
+}}
+
+QPushButton:disabled {{
+    background-color: {self._qcolor_to_css(palette['surface_container'])};
+    color: {self._qcolor_to_css(palette['on_surface_variant'])};
+}}
+
+/* QFrame */
+QFrame {{
+    background-color: {self._qcolor_to_css(palette['surface'])};
+    border: 1px solid {self._qcolor_to_css(palette['outline_variant'])};
+    border-radius: 8px;
+}}
+
+/* QLabel */
+QLabel {{
+    color: {self._qcolor_to_css(palette['on_surface'])};
+    background-color: transparent;
+}}
+
+/* QLineEdit, QTextEdit */
+QLineEdit, QTextEdit {{
+    background-color: {self._qcolor_to_css(palette['surface_container_low'])};
+    color: {self._qcolor_to_css(palette['on_surface'])};
+    border: 1px solid {self._qcolor_to_css(palette['outline'])};
+    border-radius: 6px;
+    padding: 6px;
+}}
+
+QLineEdit:focus, QTextEdit:focus {{
+    border: 2px solid {self._qcolor_to_css(palette['primary'])};
+}}
+
+/* QCheckBox */
+QCheckBox {{
+    color: {self._qcolor_to_css(palette['on_surface'])};
+    spacing: 8px;
+}}
+
+QCheckBox::indicator {{
+    width: 20px;
+    height: 20px;
+    border: 2px solid {self._qcolor_to_css(palette['outline'])};
+    border-radius: 4px;
+    background-color: {self._qcolor_to_css(palette['surface_container_low'])};
+}}
+
+QCheckBox::indicator:checked {{
+    background-color: {self._qcolor_to_css(palette['primary'])};
+    border-color: {self._qcolor_to_css(palette['primary'])};
+}}
+
+/* QComboBox */
+QComboBox {{
+    background-color: {self._qcolor_to_css(palette['surface_container_low'])};
+    color: {self._qcolor_to_css(palette['on_surface'])};
+    border: 1px solid {self._qcolor_to_css(palette['outline'])};
+    border-radius: 6px;
+    padding: 6px;
+}}
+
+QComboBox::drop-down {{
+    border: none;
+    width: 30px;
+}}
+
+QComboBox QAbstractItemView {{
+    background-color: {self._qcolor_to_css(palette['surface_container_high'])};
+    color: {self._qcolor_to_css(palette['on_surface'])};
+    selection-background-color: {self._qcolor_to_css(palette['primary'])};
+    selection-color: {self._qcolor_to_css(palette['on_primary'])};
+}}
+
+/* QScrollBar */
+QScrollBar:vertical {{
+    background-color: {self._qcolor_to_css(palette['surface_container'])};
+    width: 12px;
+    border-radius: 6px;
+}}
+
+QScrollBar::handle:vertical {{
+    background-color: {self._qcolor_to_css(palette['outline_variant'])};
+    border-radius: 6px;
+    min-height: 30px;
+}}
+
+QScrollBar::handle:vertical:hover {{
+    background-color: {self._qcolor_to_css(palette['on_surface_variant'])};
+}}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+    height: 0px;
+}}
+
+QScrollBar:horizontal {{
+    background-color: {self._qcolor_to_css(palette['surface_container'])};
+    height: 12px;
+    border-radius: 6px;
+}}
+
+QScrollBar::handle:horizontal {{
+    background-color: {self._qcolor_to_css(palette['outline_variant'])};
+    border-radius: 6px;
+    min-width: 30px;
+}}
+
+QScrollBar::handle:horizontal:hover {{
+    background-color: {self._qcolor_to_css(palette['on_surface_variant'])};
+}}
+
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
+    width: 0px;
+}}
+
+/* QTableWidget */
+QTableWidget {{
+    background-color: {self._qcolor_to_css(palette['surface'])};
+    alternate-background-color: {self._qcolor_to_css(palette['surface_container_low'])};
+    gridline-color: {self._qcolor_to_css(palette['outline_variant'])};
+    selection-background-color: {self._qcolor_to_css(palette['secondary_container'])};
+    selection-color: {self._qcolor_to_css(palette['on_secondary_container'])};
+}}
+
+QTableWidget::item:selected {{
+    background-color: {self._qcolor_to_css(palette['secondary_container'])};
+    color: {self._qcolor_to_css(palette['on_secondary_container'])};
+}}
+
+QHeaderView::section {{
+    background-color: {self._qcolor_to_css(palette['surface_container_high'])};
+    color: {self._qcolor_to_css(palette['on_surface'])};
+    border: none;
+    border-right: 1px solid {self._qcolor_to_css(palette['outline_variant'])};
+    border-bottom: 1px solid {self._qcolor_to_css(palette['outline_variant'])};
+    padding: 8px;
+    font-weight: 600;
+}}
+
+/* QTabWidget */
+QTabWidget::pane {{
+    border: 1px solid {self._qcolor_to_css(palette['outline_variant'])};
+    background-color: {self._qcolor_to_css(palette['surface'])};
+}}
+
+QTabBar::tab {{
+    background-color: {self._qcolor_to_css(palette['surface_container_low'])};
+    color: {self._qcolor_to_css(palette['on_surface_variant'])};
+    border: 1px solid {self._qcolor_to_css(palette['outline_variant'])};
+    border-bottom: none;
+    padding: 8px 16px;
+    margin-right: 2px;
+}}
+
+QTabBar::tab:selected {{
+    background-color: {self._qcolor_to_css(palette['surface'])};
+    color: {self._qcolor_to_css(palette['primary'])};
+    border-bottom: 2px solid {self._qcolor_to_css(palette['primary'])};
+}}
+
+QTabBar::tab:hover {{
+    background-color: {self._qcolor_to_css(palette['surface_container_high'])};
+}}
+
+/* QScrollArea */
+QScrollArea {{
+    border: none;
+    background-color: transparent;
+}}
+
+/* QSlider */
+QSlider::groove:horizontal {{
+    height: 6px;
+    background: {self._qcolor_to_css(palette['surface_container_highest'])};
+    border-radius: 3px;
+}}
+
+QSlider::handle:horizontal {{
+    width: 18px;
+    height: 18px;
+    background: {self._qcolor_to_css(palette['primary'])};
+    border-radius: 9px;
+    margin: -6px 0;
+}}
+
+QSlider::sub-page:horizontal {{
+    background: {self._qcolor_to_css(palette['primary'])};
+    border-radius: 3px;
+}}
+"""
+        return qss
+    
+    def _apply_theme(self, theme):
+        """Apply the theme to the application.
+        
+        Args:
+            theme: 'light' or 'dark'
+        """
+        palette = self.dark_palette if theme == self.THEME_DARK else self.light_palette
+        
+        # Apply QPalette
+        qpalette = QApplication.palette()
+        qpalette.setColor(QPalette.Window, palette['surface'])
+        qpalette.setColor(QPalette.WindowText, palette['on_surface'])
+        qpalette.setColor(QPalette.Base, palette['surface_container_low'])
+        qpalette.setColor(QPalette.AlternateBase, palette['surface_container'])
+        qpalette.setColor(QPalette.ToolTipBase, palette['surface_container_highest'])
+        qpalette.setColor(QPalette.ToolTipText, palette['on_surface'])
+        qpalette.setColor(QPalette.Text, palette['on_surface'])
+        qpalette.setColor(QPalette.Button, palette['surface_container_high'])
+        qpalette.setColor(QPalette.ButtonText, palette['on_surface'])
+        qpalette.setColor(QPalette.BrightText, palette['primary'])
+        qpalette.setColor(QPalette.Link, palette['primary'])
+        qpalette.setColor(QPalette.Highlight, palette['primary_container'])
+        qpalette.setColor(QPalette.HighlightedText, palette['on_primary_container'])
+        
+        self.app.setPalette(qpalette)
+        
+        # Apply QSS stylesheet
+        qss = self._generate_qss(theme)
+        self.app.setStyleSheet(qss)
+    
+    def _qcolor_to_css(self, color):
+        """Convert QColor to CSS color string."""
+        return f"rgb({color.red()}, {color.green()}, {color.blue()})"
+    
+    def _adjust_brightness(self, color, amount):
+        """Adjust brightness of a color by amount (-255 to 255)."""
+        r = max(0, min(255, color.red() + amount))
+        g = max(0, min(255, color.green() + amount))
+        b = max(0, min(255, color.blue() + amount))
+        return f"rgb({r}, {g}, {b})"

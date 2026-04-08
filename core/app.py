@@ -30,6 +30,7 @@ from core import directories, results, export, fs, prioritize
 from core.ignore import IgnoreList
 from core.exclude import ExcludeDict as ExcludeList
 from core.scanner import ScanType
+from core.action_journal import ActionJournal, ActionType
 from core.gui.deletion_options import DeletionOptions
 from core.gui.details_panel import DetailsPanel
 from core.gui.directory_tree import DirectoryTree
@@ -37,6 +38,10 @@ from core.gui.ignore_list_dialog import IgnoreListDialog
 from core.gui.exclude_list_dialog import ExcludeListDialogCore
 from core.gui.problem_dialog import ProblemDialog
 from core.gui.stats_label import StatsLabel
+from core.session_manager import SessionManager, SessionData
+from core.export import export_to_json, generate_summary_report, export_summary_report
+from core.auto_clean import AutoCleanManager
+from core.keyboard_shortcuts import KeyboardShortcutManager
 
 HAD_FIRST_LAUNCH_PREFERENCE = "HadFirstLaunch"
 DEBUG_MODE_PREFERENCE = "DebugMode"
@@ -164,6 +169,13 @@ class DupeGuru(Broadcaster):
         self.result_table = None
         self.deletion_options = DeletionOptions()
         self.progress_window = ProgressWindow(self._job_completed, self._job_error)
+        self.action_journal = ActionJournal(max_history=10)  # Track actions for undo
+        # Initialize session manager
+        session_dir = op.join(self.appdata, "sessions")
+        self.session_manager = SessionManager(session_dir)
+        # Initialize keyboard shortcuts manager
+        shortcuts_path = op.join(self.appdata, "keyboard_shortcuts.json")
+        self.keyboard_shortcuts = KeyboardShortcutManager(shortcuts_path)
         children = [self.directory_tree, self.stats_label, self.details_panel]
         for child in children:
             child.connect()
@@ -515,6 +527,139 @@ class DupeGuru(Broadcaster):
             except OSError as e:
                 self.view.show_message(tr("Couldn't write to file: {}").format(str(e)))
 
+    def export_to_json(self):
+        """Export current results to JSON format."""
+        dest_file = self.view.select_dest_file(tr("Select a destination for your exported JSON"), "json")
+        if dest_file:
+            colnames, rows = self._get_export_data()
+            metadata = {
+                "scan_time": datetime.datetime.now().isoformat(),
+                "app_mode": ["standard", "music", "picture"][self.app_mode],
+                "directories": [str(d) for d in self.directories],
+                "total_groups": len(self.results.groups),
+            }
+            try:
+                export_to_json(dest_file, colnames, rows, metadata)
+                msg = tr("Results exported to {}").format(dest_file)
+                self.view.show_message(msg)
+            except OSError as e:
+                self.view.show_message(tr("Couldn't write to file: {}").format(str(e)))
+
+    def generate_summary_report(self):
+        """Generate and export a summary report."""
+        dest_file = self.view.select_dest_file(tr("Select a destination for summary report"), "json")
+        if dest_file:
+            app_mode_str = ["standard", "music", "picture"][self.app_mode]
+            summary = generate_summary_report(self.results, app_mode_str)
+            try:
+                export_summary_report(dest_file, summary)
+                
+                # Show summary to user
+                msg = tr("Summary Report:\n\n")
+                msg += tr("Total Groups: {}\n").format(summary["total_groups"])
+                msg += tr("Total Duplicates: {}\n").format(summary["total_duplicates"])
+                msg += tr("Marked for Deletion: {}\n").format(summary["marked_duplicates"])
+                msg += tr("Space Saved: {} bytes\n").format(summary["space_saved_bytes"])
+                msg += tr("Average Similarity: {}%\n").format(summary["average_similarity"])
+                
+                self.view.show_message(msg)
+            except OSError as e:
+                self.view.show_message(tr("Couldn't write to file: {}").format(str(e)))
+
+    def initialize_auto_clean_manager(self):
+        """Initialize the auto-clean manager if not already done."""
+        if not hasattr(self, 'auto_clean_manager'):
+            profile_dir = op.join(self.appdata, "profiles")
+            self.auto_clean_manager = AutoCleanManager(profile_dir)
+
+    def get_auto_clean_profiles(self):
+        """Get list of available auto-clean profiles (default + custom)."""
+        self.initialize_auto_clean_manager()
+        default_profiles = self.auto_clean_manager.get_default_profiles()
+        custom_profile_names = self.auto_clean_manager.list_profiles()
+        
+        profiles = default_profiles
+        for name in custom_profile_names:
+            profile = self.auto_clean_manager.load_profile(name)
+            if profile:
+                profiles.append(profile)
+        
+        return profiles
+
+    def preview_auto_clean(self, profile_name):
+        """Preview what an auto-clean profile would do."""
+        self.initialize_auto_clean_manager()
+        
+        # Try to load as custom profile first
+        profile = self.auto_clean_manager.load_profile(profile_name)
+        
+        # If not found, try default profiles
+        if not profile:
+            default_profiles = self.auto_clean_manager.get_default_profiles()
+            for p in default_profiles:
+                if p.name == profile_name:
+                    profile = p
+                    break
+        
+        if not profile:
+            self.view.show_message(tr("Profile '{}' not found.").format(profile_name))
+            return
+        
+        # Preview
+        preview = self.auto_clean_manager.preview_profile(
+            profile, self.results, self.results.presenter
+        )
+        
+        msg = tr("Auto-Clean Preview: {}\n\n").format(profile.name)
+        msg += tr("Groups to Process: {}\n").format(preview["groups_to_process"])
+        msg += tr("Files to Mark: {}\n").format(preview["total_files_to_mark"])
+        msg += tr("Space to Free: {} bytes\n").format(preview["space_to_free_bytes"])
+        msg += tr("\nDescription: {}").format(profile.description)
+        
+        self.view.show_message(msg)
+
+    def execute_auto_clean(self, profile_name):
+        """Execute an auto-clean profile."""
+        self.initialize_auto_clean_manager()
+        
+        # Try to load as custom profile first
+        profile = self.auto_clean_manager.load_profile(profile_name)
+        
+        # If not found, try default profiles
+        if not profile:
+            default_profiles = self.auto_clean_manager.get_default_profiles()
+            for p in default_profiles:
+                if p.name == profile_name:
+                    profile = p
+                    break
+        
+        if not profile:
+            self.view.show_message(tr("Profile '{}' not found.").format(profile_name))
+            return
+        
+        # Confirm with user
+        preview = self.auto_clean_manager.preview_profile(
+            profile, self.results, self.results.presenter
+        )
+        
+        msg = tr("Execute auto-clean profile '{}':\n\n").format(profile.name)
+        msg += tr("This will mark {} files in {} groups.\n\n").format(
+            preview["total_files_to_mark"], preview["groups_to_process"]
+        )
+        msg += tr("Continue?")
+        
+        if not self.view.ask_yes_no(msg):
+            return
+        
+        # Execute
+        files_marked = self.auto_clean_manager.execute_profile(
+            profile, self.results, self.results.presenter
+        )
+        
+        self.notify("marking_changed")
+        msg = tr("Auto-clean '{}' marked {} files.").format(profile.name, files_marked)
+        self.view.show_message(msg)
+
     def get_display_info(self, dupe, group, delta=False):
         def empty_data():
             return {c.name: "---" for c in self.result_table.COLUMNS[1:]}
@@ -652,8 +797,21 @@ class DupeGuru(Broadcaster):
         """
         if marked:
             self.results.mark(dupe)
+            self.action_journal.record_mark(self.results, [dupe])
         else:
             self.results.unmark(dupe)
+            self.action_journal.record_unmark(self.results, [dupe])
+        self.notify("marking_changed")
+    
+    def mark_multiple(self, files):
+        """Mark multiple files at once (for bulk actions).
+        
+        :param files: List of files to mark
+        """
+        for file_obj in files:
+            if self.results.is_markable(file_obj):
+                self.results.mark(file_obj)
+        self.action_journal.record_mark(self.results, files)
         self.notify("marking_changed")
 
     def open_selected(self):
@@ -786,6 +944,130 @@ class DupeGuru(Broadcaster):
         except OSError as e:
             self.view.show_message(tr("Couldn't write to file: {}").format(str(e)))
 
+    def save_session(self, session_name: str) -> bool:
+        """Save current state as a named session.
+        
+        Args:
+            session_name: Name for the session
+        
+        Returns:
+            True if saved successfully
+        """
+        try:
+            session = SessionData()
+            session.app_mode = self.app_mode
+            session.scan_time = datetime.datetime.now()
+            session.directories = [str(d) for d in self.directories]
+            session.preset = self.options.copy()
+            
+            # Save results to XML first
+            results_filename = f"{session_name}_results.xml"
+            results_path = op.join(self.session_manager.session_dir, results_filename)
+            self.results.save_to_xml(results_path)
+            session.results_xml_path = results_filename
+            
+            # Save marked files
+            session.marked_files = [str(d.path) for d in self.results.dupes if self.results.is_marked(d)]
+            
+            # Save filters/sorts if active
+            if hasattr(self.results, '_filter_sort_manager') and self.results._filter_sort_manager:
+                session.filters = [str(f) for f in self.results._filter_sort_manager.active_filters]
+                session.sort_criteria = self.results._filter_sort_manager.active_sort.value
+            
+            # Update folder timestamps for incremental scanning
+            self.session_manager.update_folder_timestamps(session.directories, session)
+            
+            # Save session
+            self.session_manager.save_session(session, session_name)
+            
+            msg = tr("Session '{}' saved successfully.").format(session_name)
+            self.view.show_message(msg)
+            return True
+        except Exception as e:
+            logging.error(f"Failed to save session: {e}")
+            self.view.show_message(tr("Failed to save session: {}").format(str(e)))
+            return False
+
+    def load_session(self, session_name: str) -> bool:
+        """Load a named session.
+        
+        Args:
+            session_name: Name of the session to load
+        
+        Returns:
+            True if loaded successfully
+        """
+        session = self.session_manager.load_session(session_name)
+        if not session:
+            self.view.show_message(tr("Session '{}' not found.").format(session_name))
+            return False
+        
+        try:
+            # Check for folder changes
+            if self.session_manager.has_any_changes(session):
+                msg = tr("Some folders have changed since this session was saved. Continue loading?")
+                if not self.view.ask_yes_no(msg):
+                    return False
+            
+            # Load directories
+            self.directories.__init__()
+            for directory in session.directories:
+                try:
+                    self.directories.add_path(Path(directory))
+                except Exception as e:
+                    logging.warning(f"Could not add directory {directory}: {e}")
+            
+            # Load results
+            if session.results_xml_path:
+                results_path = op.join(self.session_manager.session_dir, session.results_xml_path)
+                if op.exists(results_path):
+                    self.load_from(results_path)
+                else:
+                    self.view.show_message(tr("Results file not found for session."))
+                    return False
+            
+            # Restore options
+            for key, value in session.preset.items():
+                if key in self.options:
+                    self.options[key] = value
+            
+            # Restore filters/sorts (will be applied in next phase with UI)
+            if session.filters or session.sort_criteria:
+                logging.info(f"Session has {len(session.filters)} filters and sort: {session.sort_criteria}")
+            
+            msg = tr("Session '{}' loaded successfully.").format(session_name)
+            self.view.show_message(msg)
+            return True
+        except Exception as e:
+            logging.error(f"Failed to load session: {e}")
+            self.view.show_message(tr("Failed to load session: {}").format(str(e)))
+            return False
+
+    def list_sessions(self) -> list:
+        """Get list of available sessions.
+        
+        Returns:
+            List of session names
+        """
+        return self.session_manager.list_sessions()
+
+    def delete_session(self, session_name: str) -> bool:
+        """Delete a session.
+        
+        Args:
+            session_name: Name of session to delete
+        
+        Returns:
+            True if deleted successfully
+        """
+        result = self.session_manager.delete_session(session_name)
+        if result:
+            msg = tr("Session '{}' deleted.").format(session_name)
+            self.view.show_message(msg)
+        else:
+            self.view.show_message(tr("Session '{}' not found.").format(session_name))
+        return result
+
     def start_scanning(self, profile_scan=False):
         """Starts an async job to scan for duplicates.
 
@@ -854,6 +1136,55 @@ class DupeGuru(Broadcaster):
 
     def set_default(self, key, value):
         self.view.set_default(key, value)
+    
+    def can_undo(self):
+        """Check if there's an action that can be undone."""
+        return self.action_journal.can_undo()
+    
+    def get_undo_description(self):
+        """Get description of the last action for undo UI."""
+        record = self.action_journal.get_last_action()
+        if record:
+            return self.action_journal.get_action_description(record)
+        return ""
+    
+    def undo_last_action(self):
+        """Undo the last destructive action.
+        
+        This is a simplified undo that currently only handles mark/unmark actions.
+        Full undo for delete/move/copy would require more complex recovery logic.
+        """
+        if not self.action_journal.can_undo():
+            self.view.show_message(tr("Nothing to undo."))
+            return
+        
+        record = self.action_journal.get_last_action()
+        
+        if record.action_type == ActionType.MARK:
+            # Restore previous mark states
+            for file_obj, was_marked in record.previous_marks.items():
+                if was_marked:
+                    self.results.mark(file_obj)
+                else:
+                    self.results.unmark(file_obj)
+            self.notify("marking_changed")
+            msg = tr("Undid: {}").format(self.action_journal.get_action_description(record))
+            self.view.show_message(msg)
+        elif record.action_type == ActionType.UNMARK:
+            # Restore previous mark states
+            for file_obj, was_marked in record.previous_marks.items():
+                if was_marked:
+                    self.results.mark(file_obj)
+                else:
+                    self.results.unmark(file_obj)
+            self.notify("marking_changed")
+            msg = tr("Undid: {}").format(self.action_journal.get_action_description(record))
+            self.view.show_message(msg)
+        else:
+            msg = tr("Undo not yet supported for: {}").format(
+                self.action_journal.get_action_description(record)
+            )
+            self.view.show_message(msg)
 
     # --- Properties
     @property

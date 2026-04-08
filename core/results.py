@@ -20,6 +20,8 @@ from hscommon.trans import tr
 
 from core import engine
 from core.markable import Markable
+from core.group_presenter import GroupPresenter
+from core.filter_sort_manager import FilterSortManager, SortCriteria
 
 
 class Results(Markable):
@@ -54,6 +56,8 @@ class Results(Markable):
         self.problems = []  # (dupe, error_msg)
         self.is_modified = False
         self.refresh_required = False
+        self._presenter = None  # Lazy-loaded GroupPresenter instance
+        self._filter_sort_manager = None  # Lazy-loaded FilterSortManager
 
     def _did_mark(self, dupe):
         self.__marked_size += dupe.size
@@ -160,6 +164,9 @@ class Results(Markable):
                 if not hasattr(dupe, "is_ref"):
                     dupe.is_ref = False
         self.is_modified = bool(self.__groups)
+        # Clear presenter cache when groups change
+        if self._presenter:
+            self._presenter.clear_cache()
         old_filters = nonone(self.__filters, [])
         self.apply_filter(None)
         for filter_str in old_filters:
@@ -413,6 +420,36 @@ class Results(Markable):
         """
         self.groups.sort(key=lambda g: self.app._get_group_sort_key(g, key), reverse=not asc)
         self.__groups_sort_descriptor = (key, asc)
+
+    @property
+    def presenter(self):
+        """
+        Lazy-loaded property that provides access to the GroupPresenter.
+        
+        The presenter offers card-ready data and group-level selection helpers
+        for the new UI without modifying the core Results behavior.
+        
+        Returns:
+            GroupPresenter: Instance providing extended result presentation methods
+        """
+        if self._presenter is None:
+            self._presenter = GroupPresenter(self)
+        return self._presenter
+    
+    @property
+    def filter_sort(self):
+        """
+        Lazy-loaded property that provides access to the FilterSortManager.
+        
+        The manager provides filtering and sorting capabilities for duplicate groups
+        without modifying the underlying results data.
+        
+        Returns:
+            FilterSortManager: Instance providing filter and sort methods
+        """
+        if self._filter_sort_manager is None:
+            self._filter_sort_manager = FilterSortManager(self)
+        return self._filter_sort_manager
 
     # ---Properties
     dupes = property(__get_dupe_list)

@@ -9,6 +9,8 @@
 import os.path as op
 from tempfile import mkdtemp
 import csv
+import json
+from datetime import datetime
 
 # Yes, this is a very low-tech solution, but at least it doesn't have all these annoying dependency
 # and resource problems.
@@ -149,3 +151,137 @@ def export_to_csv(dest, colnames, rows):
     writer.writerow(["Group ID"] + colnames)
     for row in rows:
         writer.writerow(row)
+
+
+def export_to_json(dest, colnames, rows, metadata=None):
+    """Export results to JSON format.
+    
+    Args:
+        dest: Destination file path
+        colnames: List of column names
+        rows: List of row data (group_id, filename, values...)
+        metadata: Optional metadata dict (scan_time, directories, etc.)
+    
+    Returns:
+        Path to the exported file
+    """
+    export_data = {
+        "export_time": datetime.now().isoformat(),
+        "format_version": "1.0",
+        "columns": colnames,
+        "groups": [],
+    }
+    
+    # Add metadata if provided
+    if metadata:
+        export_data["metadata"] = metadata
+    
+    # Group rows by group_id
+    current_group = None
+    for row in rows:
+        group_id = row[0]
+        filename = row[1]
+        values = row[2:]
+        
+        # Create dict for this row
+        row_dict = dict(zip(colnames, values))
+        row_dict["filename"] = filename
+        
+        if group_id != current_group:
+            # New group
+            export_data["groups"].append({
+                "group_id": group_id,
+                "files": [row_dict]
+            })
+            current_group = group_id
+        else:
+            # Add to existing group
+            export_data["groups"][-1]["files"].append(row_dict)
+    
+    # Write to file
+    with open(dest, 'w', encoding='utf-8') as f:
+        json.dump(export_data, f, indent=2, ensure_ascii=False)
+    
+    return dest
+
+
+def generate_summary_report(results, app_mode="standard"):
+    """Generate a summary report of scan results.
+    
+    Args:
+        results: Results object with duplicate groups
+        app_mode: App mode (standard/music/picture)
+    
+    Returns:
+        Dict with summary statistics
+    """
+    groups = results.groups
+    total_groups = len(groups)
+    total_duplicates = sum(len(g.dupes) for g in groups)
+    marked_duplicates = results.mark_count
+    
+    # Calculate space statistics
+    total_size = sum(g.ref.size for g in groups if hasattr(g.ref, 'size'))
+    marked_size = 0
+    space_saved = 0
+    
+    for group in groups:
+        for dupe in group.dupes:
+            if results.is_marked(dupe) and hasattr(dupe, 'size'):
+                marked_size += dupe.size
+        
+        # Space that could be saved by removing duplicates
+        ref_size = group.ref.size if hasattr(group.ref, 'size') else 0
+        dupe_sizes = sum(d.size for d in group.dupes if hasattr(d, 'size'))
+        space_saved += dupe_sizes - ref_size
+    
+    # Calculate similarity statistics
+    similarities = [g.percentage for g in groups if hasattr(g, 'percentage')]
+    avg_similarity = sum(similarities) / len(similarities) if similarities else 0
+    min_similarity = min(similarities) if similarities else 0
+    max_similarity = max(similarities) if similarities else 0
+    
+    # Mode-specific statistics
+    mode_stats = {}
+    if app_mode == "picture":
+        # Count by resolution
+        resolution_counts = {}
+        for group in groups:
+            if hasattr(group.ref, 'dimensions') and group.ref.dimensions:
+                res = f"{group.ref.dimensions[0]}x{group.ref.dimensions[1]}"
+                resolution_counts[res] = resolution_counts.get(res, 0) + 1
+        
+        mode_stats = {
+            "resolution_distribution": resolution_counts,
+        }
+    
+    return {
+        "scan_time": datetime.now().isoformat(),
+        "app_mode": app_mode,
+        "total_groups": total_groups,
+        "total_duplicates": total_duplicates,
+        "marked_duplicates": marked_duplicates,
+        "unmarked_duplicates": total_duplicates - marked_duplicates,
+        "total_size_bytes": total_size,
+        "marked_size_bytes": marked_size,
+        "space_saved_bytes": space_saved,
+        "average_similarity": round(avg_similarity, 2),
+        "min_similarity": round(min_similarity, 2),
+        "max_similarity": round(max_similarity, 2),
+        "mode_specific": mode_stats,
+    }
+
+
+def export_summary_report(dest, summary_data):
+    """Export summary report to JSON file.
+    
+    Args:
+        dest: Destination file path
+        summary_data: Summary data dict from generate_summary_report()
+    
+    Returns:
+        Path to the exported file
+    """
+    with open(dest, 'w', encoding='utf-8') as f:
+        json.dump(summary_data, f, indent=2, ensure_ascii=False)
+    return dest

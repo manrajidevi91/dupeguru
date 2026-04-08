@@ -173,6 +173,7 @@ class Preferences(PreferencesBase):
         self.portable = get("Portable", False)
         self.use_dark_style = get("UseDarkStyle", False)
         self.use_native_dialogs = get("UseNativeDialogs", True)
+        self.theme_mode = get("ThemeMode", "auto")  # New: "light", "dark", or "auto"
 
         self.tableFontSize = get("TableFontSize", self.tableFontSize)
         self.reference_bold_font = get("ReferenceBoldFont", self.reference_bold_font)
@@ -297,6 +298,7 @@ class Preferences(PreferencesBase):
         set_("Portable", self.portable)
         set_("UseDarkStyle", self.use_dark_style)
         set_("UseNativeDialogs", self.use_native_dialogs)
+        set_("ThemeMode", self.theme_mode)  # Save theme mode preference
 
         set_("TableFontSize", self.tableFontSize)
         set_("ReferenceBoldFont", self.reference_bold_font)

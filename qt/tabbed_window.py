@@ -19,6 +19,7 @@ from qt.directories_dialog import DirectoriesDialog
 from qt.result_window import ResultWindow
 from qt.ignore_list_dialog import IgnoreListDialog
 from qt.exclude_list_dialog import ExcludeListDialog
+from qt.dashboard import Dashboard
 
 tr = trget("ui")
 
@@ -168,6 +169,8 @@ class TabWindow(QMainWindow):
             model = kwargs.get("model")
             page = ExcludeListDialog(app, parent, model)
             page.accepted.connect(self.onDialogAccepted)
+        elif cls == "Dashboard":
+            page = Dashboard(app)
         self.pages[cls] = page  # Not used, might remove
         return page
 

@@ -154,6 +154,13 @@ Some native dialogs have limited functionality."
         if plat.ISWINDOWS:
             self._setupAddCheckbox("use_dark_style", tr("Use dark style"))
             layout.addWidget(self.use_dark_style)
+        # Theme mode selection
+        theme_label = QLabel(tr("Theme:"), self)
+        self.theme_combo = QComboBox(self)
+        self.theme_combo.addItem(tr("Light"), "light")
+        self.theme_combo.addItem(tr("Dark"), "dark")
+        self.theme_combo.addItem(tr("Auto (System)"), "auto")
+        layout.addLayout(horizontal_wrap([theme_label, self.theme_combo, None]))
         self.ui_groupbox.setLayout(layout)
         self.displayVLayout.addWidget(self.ui_groupbox)
 
@@ -322,6 +329,12 @@ most users should not have to modify these."
             setchecked(self.use_native_dialogs, prefs.use_native_dialogs)
             if plat.ISWINDOWS:
                 setchecked(self.use_dark_style, prefs.use_dark_style)
+            # Load theme mode
+            theme_mode = prefs.theme_mode
+            for i in range(self.theme_combo.count()):
+                if self.theme_combo.itemData(i) == theme_mode:
+                    self.theme_combo.setCurrentIndex(i)
+                    break
             setchecked(
                 self.details_dialog_titlebar_enabled,
                 prefs.details_dialog_titlebar_enabled,
@@ -377,6 +390,8 @@ most users should not have to modify these."
         prefs.use_native_dialogs = ischecked(self.use_native_dialogs)
         if plat.ISWINDOWS:
             prefs.use_dark_style = ischecked(self.use_dark_style)
+        # Save theme mode
+        prefs.theme_mode = self.theme_combo.currentData()
         lang_code = self.languageComboBox.currentData()
         old_lang_code = self.app.prefs.language
         if old_lang_code not in self.supportedLanguages.keys():
