@@ -66,8 +66,8 @@ class ResultWindow(QMainWindow):
         self.resultsListView.fileClicked.connect(self._on_file_clicked)
         
         # Connect signals for updating states
-        self.app.model.results_reloaded.connect(self.reloadResults)
-        self.app.model.marks_changed.connect(self.resultsListView.refresh)
+        self.app.resultsChanged.connect(self.reloadResults)
+        self.app.markingChanged.connect(self.resultsListView.refresh)
         
         self.menuColumns.triggered.connect(self.columnToggled)
         self.resultsView.doubleClicked.connect(self.resultsDoubleClicked)
@@ -332,23 +332,6 @@ class ResultWindow(QMainWindow):
         action = menu.addAction(tr("Reset to Defaults"))
         action.item_index = -1
 
-        # Action menu
-        action_menu = QMenu(tr("Actions"), menubar)
-        action_menu.addAction(self.actionDeleteMarked)
-        action_menu.addAction(self.actionMoveMarked)
-        action_menu.addAction(self.actionCopyMarked)
-        action_menu.addAction(self.actionRemoveMarked)
-        action_menu.addSeparator()
-        action_menu.addAction(self.actionRemoveSelected)
-        action_menu.addAction(self.actionIgnoreSelected)
-        action_menu.addAction(self.actionMakeSelectedReference)
-        action_menu.addSeparator()
-        action_menu.addAction(self.actionOpenSelected)
-        action_menu.addAction(self.actionRevealSelected)
-        action_menu.addAction(self.actionInvokeCustomCommand)
-        action_menu.addAction(self.actionRenameSelected)
-        self.actionActions.setMenu(action_menu)
-        self.actionsButton.setMenu(self.actionActions.menu())
 
     def _setupUi(self):
         self.setWindowTitle(tr("{} Results").format(self.app.NAME))

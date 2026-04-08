@@ -302,6 +302,8 @@ class DupeGuru(QObject):
     # --- Signals
     willSavePrefs = pyqtSignal()
     SIGTERM = pyqtSignal()
+    resultsChanged = pyqtSignal()
+    markingChanged = pyqtSignal()
 
     # --- Events
     def finishedLaunching(self):
@@ -353,7 +355,7 @@ class DupeGuru(QObject):
         if not self.model.directories:
             self.show_message(tr("Please add at least one directory to scan."))
             return
-        self.model.scan()
+        self.model.start_scanning()
 
     def addDirectoryTriggered(self):
         # reuse the logic from directories_dialog if possible, or just call model
@@ -426,6 +428,13 @@ class DupeGuru(QObject):
 
     def ask_yes_no(self, prompt):
         return self.confirm("", prompt)
+
+    # --- Listener methods
+    def results_changed(self):
+        self.resultsChanged.emit()
+
+    def marking_changed(self):
+        self.markingChanged.emit()
 
     def create_results_window(self):
         """Creates resultWindow and details_dialog depending on the selected ``app_mode``."""
