@@ -173,7 +173,7 @@ class SidebarWindow(QMainWindow):
 
     def _update_sidebar_folders(self):
         """Update the folder list in the sidebar."""
-        folders = [str(f.path) for f in self.app.model.directories]
+        folders = [str(f) for f in self.app.model.directories]
         self.navigation_rail.update_folders(folders)
 
     def _on_mode_changed(self, mode_name):
