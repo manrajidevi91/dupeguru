@@ -36,7 +36,7 @@ class ThemeManager(QObject):
     def __init__(self, app):
         super().__init__()
         self.app = app
-        self.current_theme = self.THEME_LIGHT
+        self.current_theme = self.THEME_DARK
         self.system_dark_mode = False
         
         # Color palettes based on New_UI.html design
@@ -47,6 +47,7 @@ class ThemeManager(QObject):
             'surface_container': QColor(32, 32, 32),  # #202020
             'surface_container_high': QColor(42, 42, 42),  # #2a2a2a
             'surface_container_highest': QColor(53, 53, 53),  # #353535
+            'surface_container_lowest': QColor(14, 14, 14),  # #0e0e0e
             'primary': QColor(163, 201, 255),  # #a3c9ff
             'on_primary': QColor(0, 49, 92),  # #00315c
             'primary_container': QColor(0, 120, 212),  # #0078d4
@@ -68,6 +69,15 @@ class ThemeManager(QObject):
             'inverse_surface': QColor(229, 226, 225),  # #e5e2e1
             'inverse_on_surface': QColor(48, 48, 48),  # #303030
             'inverse_primary': QColor(0, 96, 171),  # #0060ab
+            
+            # Application Specific Extras
+            'sidebar_bg': QColor(30, 30, 30, 180), # Mica-like semi-transparent
+            'badge_bg': QColor(163, 201, 255, 51), # Primary with 0.2 opacity
+            'reference_bg': QColor(27, 27, 28), # surface-container-low
+            'duplicate_bg': QColor(32, 32, 32), # surface-container
+            'duplicate_hover_bg': QColor(42, 42, 42), # surface-container-high
+            'indented_line': QColor(255, 255, 255, 13), # border-white/5
+            'primary_gradient': "qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #a3c9ff, stop:1 #0078d4)"
         }
         
         self.light_palette = {
@@ -77,6 +87,7 @@ class ThemeManager(QObject):
             'surface_container': QColor(233, 233, 233),  # #e9e9e9
             'surface_container_high': QColor(227, 227, 227),  # #e3e3e3
             'surface_container_highest': QColor(221, 221, 221),  # #dddddd
+            'surface_container_lowest': QColor(250, 250, 250),
             'primary': QColor(0, 120, 212),  # Windows 11 blue
             'on_primary': QColor(255, 255, 255),  # White text on primary
             'primary_container': QColor(211, 227, 255),  # #d3e3ff
@@ -98,6 +109,15 @@ class ThemeManager(QObject):
             'inverse_surface': QColor(49, 48, 51),  # Dark
             'inverse_on_surface': QColor(244, 239, 244),  # Light
             'inverse_primary': QColor(163, 201, 255),  # Light blue
+            
+            # Application Specific Extras
+            'sidebar_bg': QColor(240, 240, 240, 200),
+            'badge_bg': QColor(0, 120, 212, 51),
+            'reference_bg': QColor(245, 245, 245),
+            'duplicate_bg': QColor(255, 255, 255),
+            'duplicate_hover_bg': QColor(240, 248, 255),
+            'indented_line': QColor(0, 0, 0, 13),
+            'primary_gradient': "qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #0078d4, stop:1 #005a9e)"
         }
         
     def get_current_theme(self):
@@ -179,12 +199,14 @@ class ThemeManager(QObject):
     def _generate_qss(self, theme):
         """Generate QSS stylesheet for the given theme."""
         palette = self.dark_palette if theme == self.THEME_DARK else self.light_palette
+        is_dark = theme == self.THEME_DARK
         
         qss = f"""
 /* Common Styles */
 QWidget {{
     background-color: {self._qcolor_to_css(palette['background'])};
     color: {self._qcolor_to_css(palette['on_surface'])};
+    font-family: 'Inter', 'Segoe UI', sans-serif;
 }}
 
 /* QMainWindow */
@@ -192,92 +214,281 @@ QMainWindow {{
     background-color: {self._qcolor_to_css(palette['surface'])};
 }}
 
-/* Sidebar / Navigation Rail */
-NavigationRail {{
-    background-color: {self._qcolor_to_css(palette['surface_container'])};
-    border-right: 1px solid {self._qcolor_to_css(palette['outline_variant'])};
+/* Menu Bar */
+QMenuBar {{
+    background-color: {self._qcolor_to_css(palette['surface'])};
+    color: {self._qcolor_to_css(palette['on_surface'])};
+    border-bottom: 1px solid {self._qcolor_to_css(palette['indented_line'])};
+    padding: 2px;
 }}
 
-NavigationRail QPushButton {{
+QMenuBar::item {{
+    background: transparent;
+    padding: 4px 10px;
+    border-radius: 4px;
+}}
+
+QMenuBar::item:selected {{
+    background: {self._qcolor_to_css(palette['surface_container_highest'])};
+}}
+
+QMenu {{
+    background-color: {self._qcolor_to_css(palette['surface_container'])};
+    color: {self._qcolor_to_css(palette['on_surface'])};
+    border: 1px solid {self._qcolor_to_css(palette['outline_variant'])};
+    border-radius: 8px;
+    padding: 4px;
+}}
+
+QMenu::item {{
+    padding: 6px 24px 6px 36px;
+    border-radius: 4px;
+}}
+
+QMenu::item:selected {{
+    background-color: {self._qcolor_to_css(palette['primary'])};
+    color: {self._qcolor_to_css(palette['on_primary'])};
+}}
+
+/* Sidebar / Navigation Rail */
+#NavigationRail {{
+    background-color: {self._qcolor_to_css(palette['sidebar_bg'])};
+    border-right: 1px solid {self._qcolor_to_css(palette['indented_line'])};
+}}
+
+#NavigationRail QLabel#SectionHeader {{
+    color: {self._qcolor_to_css(palette['on_surface_variant'])};
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 12px 16px 8px 16px;
+    background: transparent;
+}}
+
+QPushButton#ModeButton {{
     background-color: transparent;
     border: none;
     border-radius: 8px;
-    padding: 12px;
+    padding: 10px 16px;
     text-align: left;
     color: {self._qcolor_to_css(palette['on_surface_variant'])};
+    font-size: 13px;
+    margin: 2px 8px;
 }}
 
-NavigationRail QPushButton:hover {{
+QPushButton#ModeButton:hover {{
     background-color: {self._qcolor_to_css(palette['surface_container_highest'])};
+    color: {self._qcolor_to_css(palette['on_surface'])};
 }}
 
-NavigationRail QPushButton[selected="true"] {{
-    background-color: {self._qcolor_to_css(palette['secondary_container'])};
+QPushButton#ModeButton[active="true"] {{
+    background-color: {self._qcolor_to_css(palette['surface_container_low'])};
     color: {self._qcolor_to_css(palette['primary'])};
-    border-left: 3px solid {self._qcolor_to_css(palette['primary'])};
-}}
-
-/* QPushButton */
-QPushButton {{
-    background-color: {self._qcolor_to_css(palette['primary'])};
-    color: {self._qcolor_to_css(palette['on_primary'])};
-    border: none;
-    border-radius: 6px;
-    padding: 8px 16px;
+    border-left: 4px solid {self._qcolor_to_css(palette['primary'])};
     font-weight: 600;
 }}
 
-QPushButton:hover {{
-    background-color: {self._adjust_brightness(palette['primary'], 20)};
+/* Folder List Item */
+QWidget#FolderItem {{
+    background-color: {self._qcolor_to_css(palette['surface_container_low'])};
+    border: 1px solid transparent;
+    border-radius: 8px;
+    margin: 4px 8px;
 }}
 
-QPushButton:pressed {{
-    background-color: {self._adjust_brightness(palette['primary'], -20)};
+QWidget#FolderItem:hover {{
+    border: 1px solid {self._qcolor_to_css(palette['outline_variant'])};
 }}
 
-QPushButton:disabled {{
+/* START SCAN Button */
+QPushButton#StartScanButton {{
+    background: {palette['primary_gradient']};
+    color: {self._qcolor_to_css(palette['on_primary']) if is_dark else "#ffffff"};
+    border: none;
+    border-radius: 12px;
+    padding: 12px;
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    margin: 16px;
+}}
+
+QPushButton#StartScanButton:pressed {{
+    background: {self._qcolor_to_css(palette['primary_container'])};
+}}
+
+/* Scan Options Controls */
+QComboBox {{
+    background-color: {self._qcolor_to_css(palette['surface_container_low'])};
+    border: 1px solid {self._qcolor_to_css(palette['outline_variant'])};
+    border-radius: 8px;
+    padding: 6px 12px;
+    min-height: 24px;
+}}
+
+QComboBox::drop-down {{
+    border: none;
+    width: 24px;
+}}
+
+QComboBox QAbstractItemView {{
     background-color: {self._qcolor_to_css(palette['surface_container'])};
+    border: 1px solid {self._qcolor_to_css(palette['outline_variant'])};
+    selection-background-color: {self._qcolor_to_css(palette['primary'])};
+    outline: none;
+}}
+
+QSlider::groove:horizontal {{
+    border: none;
+    height: 4px;
+    background: {self._qcolor_to_css(palette['surface_container_highest'])};
+    margin: 2px 0;
+    border-radius: 2px;
+}}
+
+QSlider::handle:horizontal {{
+    background: {self._qcolor_to_css(palette['primary'])};
+    border: none;
+    width: 14px;
+    height: 14px;
+    margin: -5px 0;
+    border-radius: 7px;
+}}
+
+/* Results Header */
+QLabel#ResultsHeaderTitle {{
+    background: transparent;
+    font-size: 24px;
+    font-weight: 600;
+    color: {self._qcolor_to_css(palette['on_surface'])};
+}}
+
+QLabel#ResultsHeaderLabel {{
+    background: transparent;
+    font-size: 11px;
+    font-weight: 800;
+    color: {self._qcolor_to_css(palette['primary'])};
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}}
+
+/* Result Entry Cards */
+QFrame[class="ReferenceEntry"] {{
+    background-color: {self._qcolor_to_css(palette['reference_bg'])};
+    border: 1px solid {self._qcolor_to_css(palette['outline_variant'])};
+    border-radius: 12px;
+}}
+
+QFrame[class="DuplicateEntry"] {{
+    background-color: {self._qcolor_to_css(palette['duplicate_bg'])};
+    border-radius: 12px;
+}}
+
+QFrame[class="DuplicateEntry"]:hover {{
+    background-color: {self._qcolor_to_css(palette['duplicate_hover_bg'])};
+}}
+
+/* Badges */
+QLabel#ReferenceBadge {{
+    background-color: {self._qcolor_to_css(palette['badge_bg'])};
+    color: {self._qcolor_to_css(palette['primary'])};
+    border-radius: 10px;
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 800;
+}}
+
+/* Action Buttons in Results Header */
+QPushButton#ActionBtn {{
+    background-color: {self._qcolor_to_css(palette['surface_container_high'])};
+    border: 1px solid {self._qcolor_to_css(palette['outline_variant'])};
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-weight: 600;
+    font-size: 13px;
+}}
+
+QPushButton#ActionBtn:hover {{
+    background-color: {self._qcolor_to_css(palette['surface_container_highest'])};
+}}
+
+QPushButton#DeleteSelectedBtn {{
+    background-color: rgba(255, 180, 171, 26); /* error with low alpha */
+    color: {self._qcolor_to_css(palette['error'])};
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-weight: 600;
+    font-size: 13px;
+}}
+
+QPushButton#DeleteSelectedBtn:hover {{
+    background-color: rgba(255, 180, 171, 51);
+}}
+
+/* Entry Sub-items */
+QLabel#EntryName {{
+    background: transparent;
+    font-size: 13px;
+    font-weight: 700;
+    color: {self._qcolor_to_css(palette['on_surface'])};
+}}
+
+QLabel#EntryPath {{
+    background: transparent;
+    font-size: 11px;
     color: {self._qcolor_to_css(palette['on_surface_variant'])};
 }}
 
-/* QFrame */
-QFrame {{
-    background-color: {self._qcolor_to_css(palette['surface'])};
-    border: 1px solid {self._qcolor_to_css(palette['outline_variant'])};
+QLabel#EntryMeta {{
+    background: transparent;
+    font-size: 10px;
+    color: {self._qcolor_to_css(palette['outline'])};
+}}
+
+QLabel#MatchBadge {{
+    background: transparent;
+    font-size: 10px;
+    font-weight: 800;
+    color: {self._qcolor_to_css(palette['primary'])};
+}}
+
+QLabel#LockIcon {{
+    background: transparent;
+    font-size: 16px;
+    opacity: 0.5;
+}}
+
+QLabel#ThumbnailContainer {{
+    background-color: {self._qcolor_to_css(palette['surface_container_lowest'])};
     border-radius: 8px;
 }}
 
-/* QLabel */
-QLabel {{
-    color: {self._qcolor_to_css(palette['on_surface'])};
+/* QScrollBar */
+QScrollBar:vertical {{
     background-color: transparent;
+    width: 6px;
+    margin: 0;
 }}
 
-/* QLineEdit, QTextEdit */
-QLineEdit, QTextEdit {{
-    background-color: {self._qcolor_to_css(palette['surface_container_low'])};
-    color: {self._qcolor_to_css(palette['on_surface'])};
-    border: 1px solid {self._qcolor_to_css(palette['outline'])};
-    border-radius: 6px;
-    padding: 6px;
+QScrollBar::handle:vertical {{
+    background-color: {self._qcolor_to_css(palette['outline_variant'])};
+    border-radius: 3px;
+    min-height: 30px;
 }}
 
-QLineEdit:focus, QTextEdit:focus {{
-    border: 2px solid {self._qcolor_to_css(palette['primary'])};
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+    height: 0px;
 }}
 
-/* QCheckBox */
-QCheckBox {{
-    color: {self._qcolor_to_css(palette['on_surface'])};
-    spacing: 8px;
-}}
-
+/* Custom Checkbox */
 QCheckBox::indicator {{
     width: 20px;
     height: 20px;
-    border: 2px solid {self._qcolor_to_css(palette['outline'])};
-    border-radius: 4px;
-    background-color: {self._qcolor_to_css(palette['surface_container_low'])};
+    border: 2px solid {self._qcolor_to_css(palette['outline_variant'])};
+    border-radius: 6px;
+    background-color: {self._qcolor_to_css(palette['surface_container_lowest'])};
 }}
 
 QCheckBox::indicator:checked {{
@@ -285,141 +496,10 @@ QCheckBox::indicator:checked {{
     border-color: {self._qcolor_to_css(palette['primary'])};
 }}
 
-/* QComboBox */
-QComboBox {{
-    background-color: {self._qcolor_to_css(palette['surface_container_low'])};
-    color: {self._qcolor_to_css(palette['on_surface'])};
-    border: 1px solid {self._qcolor_to_css(palette['outline'])};
-    border-radius: 6px;
-    padding: 6px;
-}}
-
-QComboBox::drop-down {{
-    border: none;
-    width: 30px;
-}}
-
-QComboBox QAbstractItemView {{
-    background-color: {self._qcolor_to_css(palette['surface_container_high'])};
-    color: {self._qcolor_to_css(palette['on_surface'])};
-    selection-background-color: {self._qcolor_to_css(palette['primary'])};
-    selection-color: {self._qcolor_to_css(palette['on_primary'])};
-}}
-
-/* QScrollBar */
-QScrollBar:vertical {{
-    background-color: {self._qcolor_to_css(palette['surface_container'])};
-    width: 12px;
-    border-radius: 6px;
-}}
-
-QScrollBar::handle:vertical {{
-    background-color: {self._qcolor_to_css(palette['outline_variant'])};
-    border-radius: 6px;
-    min-height: 30px;
-}}
-
-QScrollBar::handle:vertical:hover {{
-    background-color: {self._qcolor_to_css(palette['on_surface_variant'])};
-}}
-
-QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
-    height: 0px;
-}}
-
-QScrollBar:horizontal {{
-    background-color: {self._qcolor_to_css(palette['surface_container'])};
-    height: 12px;
-    border-radius: 6px;
-}}
-
-QScrollBar::handle:horizontal {{
-    background-color: {self._qcolor_to_css(palette['outline_variant'])};
-    border-radius: 6px;
-    min-width: 30px;
-}}
-
-QScrollBar::handle:horizontal:hover {{
-    background-color: {self._qcolor_to_css(palette['on_surface_variant'])};
-}}
-
-QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
-    width: 0px;
-}}
-
-/* QTableWidget */
-QTableWidget {{
-    background-color: {self._qcolor_to_css(palette['surface'])};
-    alternate-background-color: {self._qcolor_to_css(palette['surface_container_low'])};
-    gridline-color: {self._qcolor_to_css(palette['outline_variant'])};
-    selection-background-color: {self._qcolor_to_css(palette['secondary_container'])};
-    selection-color: {self._qcolor_to_css(palette['on_secondary_container'])};
-}}
-
-QTableWidget::item:selected {{
-    background-color: {self._qcolor_to_css(palette['secondary_container'])};
-    color: {self._qcolor_to_css(palette['on_secondary_container'])};
-}}
-
-QHeaderView::section {{
-    background-color: {self._qcolor_to_css(palette['surface_container_high'])};
-    color: {self._qcolor_to_css(palette['on_surface'])};
-    border: none;
-    border-right: 1px solid {self._qcolor_to_css(palette['outline_variant'])};
-    border-bottom: 1px solid {self._qcolor_to_css(palette['outline_variant'])};
-    padding: 8px;
-    font-weight: 600;
-}}
-
-/* QTabWidget */
-QTabWidget::pane {{
-    border: 1px solid {self._qcolor_to_css(palette['outline_variant'])};
-    background-color: {self._qcolor_to_css(palette['surface'])};
-}}
-
-QTabBar::tab {{
-    background-color: {self._qcolor_to_css(palette['surface_container_low'])};
-    color: {self._qcolor_to_css(palette['on_surface_variant'])};
-    border: 1px solid {self._qcolor_to_css(palette['outline_variant'])};
-    border-bottom: none;
-    padding: 8px 16px;
-    margin-right: 2px;
-}}
-
-QTabBar::tab:selected {{
-    background-color: {self._qcolor_to_css(palette['surface'])};
-    color: {self._qcolor_to_css(palette['primary'])};
-    border-bottom: 2px solid {self._qcolor_to_css(palette['primary'])};
-}}
-
-QTabBar::tab:hover {{
-    background-color: {self._qcolor_to_css(palette['surface_container_high'])};
-}}
-
-/* QScrollArea */
-QScrollArea {{
-    border: none;
-    background-color: transparent;
-}}
-
-/* QSlider */
-QSlider::groove:horizontal {{
-    height: 6px;
-    background: {self._qcolor_to_css(palette['surface_container_highest'])};
-    border-radius: 3px;
-}}
-
-QSlider::handle:horizontal {{
-    width: 18px;
-    height: 18px;
-    background: {self._qcolor_to_css(palette['primary'])};
-    border-radius: 9px;
-    margin: -6px 0;
-}}
-
-QSlider::sub-page:horizontal {{
-    background: {self._qcolor_to_css(palette['primary'])};
-    border-radius: 3px;
+/* Status Bar */
+#FooterBar {{
+    background-color: {self._qcolor_to_css(palette['background'])};
+    border-top: 1px solid {self._qcolor_to_css(palette['indented_line'])};
 }}
 """
         return qss
@@ -432,7 +512,7 @@ QSlider::sub-page:horizontal {{
         """
         palette = self.dark_palette if theme == self.THEME_DARK else self.light_palette
         
-        # Apply QPalette
+        # Apply QPalette to QApplication
         qpalette = QApplication.palette()
         qpalette.setColor(QPalette.Window, palette['surface'])
         qpalette.setColor(QPalette.WindowText, palette['on_surface'])
@@ -448,14 +528,16 @@ QSlider::sub-page:horizontal {{
         qpalette.setColor(QPalette.Highlight, palette['primary_container'])
         qpalette.setColor(QPalette.HighlightedText, palette['on_primary_container'])
         
-        self.app.setPalette(qpalette)
+        QApplication.setPalette(qpalette)
         
         # Apply QSS stylesheet
         qss = self._generate_qss(theme)
-        self.app.setStyleSheet(qss)
+        QApplication.instance().setStyleSheet(qss)
     
     def _qcolor_to_css(self, color):
         """Convert QColor to CSS color string."""
+        if color.alpha() < 255:
+            return f"rgba({color.red()}, {color.green()}, {color.blue()}, {color.alpha() / 255.0})"
         return f"rgb({color.red()}, {color.green()}, {color.blue()})"
     
     def _adjust_brightness(self, color, amount):

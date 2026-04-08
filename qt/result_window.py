@@ -23,6 +23,7 @@ from PyQt5.QtWidgets import (
     QCheckBox,
     QDesktopWidget,
     QStackedWidget,
+    QFrame,
 )
 
 from hscommon.trans import trget
@@ -42,36 +43,37 @@ from qt.pe.results_model import ResultsModel as ResultsModelPicture
 tr = trget("ui")
 
 
+from qt.results_list_view import ResultsListView
+
 class ResultWindow(QMainWindow):
     def __init__(self, parent, app, **kwargs):
         super().__init__(parent, **kwargs)
         self.app = app
         self.specific_actions = set()
         self._setupUi()
+        
         if app.model.app_mode == AppMode.PICTURE:
             MODEL_CLASS = ResultsModelPicture
         elif app.model.app_mode == AppMode.MUSIC:
             MODEL_CLASS = ResultsModelMusic
         else:
             MODEL_CLASS = ResultsModelStandard
+            
         self.resultsModel = MODEL_CLASS(self.app, self.resultsView)
         self.stats = StatsLabel(app.model.stats_label, self.statusLabel)
-        self._update_column_actions_status()
-
+        
+        # Connect new list view
+        self.resultsListView.fileClicked.connect(self._on_file_clicked)
+        
+        # Connect signals for updating states
+        self.app.model.results_reloaded.connect(self.reloadResults)
+        self.app.model.marks_changed.connect(self.resultsListView.refresh)
+        
         self.menuColumns.triggered.connect(self.columnToggled)
         self.resultsView.doubleClicked.connect(self.resultsDoubleClicked)
         self.resultsView.spacePressed.connect(self.resultsSpacePressed)
-        self.detailsButton.clicked.connect(self.actionDetails.triggered)
-        self.dupesOnlyCheckBox.stateChanged.connect(self.powerMarkerTriggered)
-        self.deltaValuesCheckBox.stateChanged.connect(self.deltaTriggered)
-        self.searchEdit.searchChanged.connect(self.searchChanged)
-        self.viewToggleButton.clicked.connect(self.toggleViewTriggered)
-        self.cardView.actionTriggered.connect(self._on_card_action_triggered)
-        self.cardView.fileClicked.connect(self._on_file_clicked)
         self.app.willSavePrefs.connect(self.appWillSavePrefs)
         
-        # Store current view mode (0 = table, 1 = card)
-        self.current_view_mode = 0
         self.comparison_dialog = None
 
     def _setupActions(self):
@@ -350,97 +352,83 @@ class ResultWindow(QMainWindow):
 
     def _setupUi(self):
         self.setWindowTitle(tr("{} Results").format(self.app.NAME))
-        self.resize(630, 514)
+        self.resize(1000, 800)
+        
         self.centralwidget = QWidget(self)
-        self.verticalLayout = QVBoxLayout(self.centralwidget)
-        self.verticalLayout.setContentsMargins(0, 0, 0, 0)
-        self.verticalLayout.setSpacing(0)
-        self.actionsButton = QPushButton(tr("Actions"))
-        self.detailsButton = QPushButton(tr("Details"))
-        self.dupesOnlyCheckBox = QCheckBox(tr("Dupes Only"))
-        self.deltaValuesCheckBox = QCheckBox(tr("Delta Values"))
-        self.searchEdit = SearchEdit()
-        self.searchEdit.setMaximumWidth(300)
-        self.horizontalLayout = horizontal_wrap(
-            [
-                self.actionsButton,
-                self.detailsButton,
-                self.dupesOnlyCheckBox,
-                self.deltaValuesCheckBox,
-                None,
-                self.searchEdit,
-                8,
-            ]
-        )
-        self.horizontalLayout.setSpacing(8)
-        self.verticalLayout.addLayout(self.horizontalLayout)
+        self.layout = QVBoxLayout(self.centralwidget)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.layout.setSpacing(0)
         
-        # Action buttons row
-        action_buttons_layout = QHBoxLayout()
+        # 1. Header Area
+        self.header_container = QWidget()
+        self.header_container.setStyleSheet("background-color: transparent; padding: 24px 24px 0 24px;")
+        header_vbox = QVBoxLayout(self.header_container)
+        header_vbox.setSpacing(8)
         
-        # View toggle button
-        self.viewToggleButton = QPushButton(tr("Card View"))
-        self.viewToggleButton.setMaximumWidth(120)
-        self.viewToggleButton.setToolTip(tr("Toggle between table and card view"))
-        action_buttons_layout.addWidget(self.viewToggleButton)
+        # Mode Label (Breadcrumb style)
+        from core.app import AppMode
+        mode_text = {AppMode.PICTURE: tr("PICTURE MODE"), AppMode.MUSIC: tr("MUSIC MODE"), AppMode.STANDARD: tr("STANDARD MODE")}
+        self.modeScaleLabel = QLabel(mode_text.get(self.app.model.app_mode, ""))
+        self.modeScaleLabel.setObjectName("ResultsHeaderLabel")
+        header_vbox.addWidget(self.modeScaleLabel)
         
-        # Undo button
-        self.undoButton = QPushButton(tr("Undo"))
-        self.undoButton.setMaximumWidth(100)
-        self.undoButton.setToolTip(tr("Undo last action (Ctrl+Z)"))
-        self.undoButton.clicked.connect(self.undoTriggered)
-        action_buttons_layout.addWidget(self.undoButton)
+        # Title and Global Actions Row
+        title_row = QHBoxLayout()
         
-        action_buttons_layout.addStretch()
-        self.verticalLayout.addLayout(action_buttons_layout)
+        self.titleLabel = QLabel(tr("Duplicate Results"))
+        self.titleLabel.setObjectName("ResultsHeaderTitle")
+        title_row.addWidget(self.titleLabel)
         
-        # Stacked widget for table/card views
-        self.viewStack = QStackedWidget(self.centralwidget)
+        title_row.addStretch()
         
-        # Table view (existing)
+        # Action Buttons
+        self.delete_btn = QPushButton(tr("Delete Selected"))
+        self.delete_btn.setObjectName("DeleteSelectedBtn")
+        self.delete_btn.setCursor(Qt.PointingHandCursor)
+        self.delete_btn.clicked.connect(self.deleteTriggered)
+        title_row.addWidget(self.delete_btn)
+        
+        self.move_btn = QPushButton(tr("Move Selected"))
+        self.move_btn.setObjectName("ActionBtn")
+        self.move_btn.setCursor(Qt.PointingHandCursor)
+        self.move_btn.clicked.connect(self.moveTriggered)
+        title_row.addWidget(self.move_btn)
+        
+        self.mark_ref_btn = QPushButton(tr("Mark References"))
+        self.mark_ref_btn.setObjectName("ActionBtn")
+        self.mark_ref_btn.setCursor(Qt.PointingHandCursor)
+        self.mark_ref_btn.clicked.connect(self.markAllTriggered)
+        title_row.addWidget(self.mark_ref_btn)
+        
+        header_vbox.addLayout(title_row)
+        self.layout.addWidget(self.header_container)
+        
+        # 2. Main Content Area (Results List)
+        # We also need an invisible ResultView (table) to keep the existing model-view sync working for menus
         self.resultsView = ResultsView(self.centralwidget)
-        self.resultsView.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.resultsView.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.resultsView.setSortingEnabled(True)
-        self.resultsView.setWordWrap(False)
-        self.resultsView.verticalHeader().setVisible(False)
-        h = self.resultsView.horizontalHeader()
-        h.setHighlightSections(False)
-        h.setSectionsMovable(True)
-        h.setStretchLastSection(False)
-        h.setDefaultAlignment(Qt.AlignLeft)
-        self.viewStack.addWidget(self.resultsView)
+        self.resultsView.hide()
         
-        # Card view (new)
-        self.cardView = CardGridView(self.app.model.results, self.centralwidget)
-        self.cardView.setVisible(False)
-        self.viewStack.addWidget(self.cardView)
+        self.resultsListView = ResultsListView(self.app.model.results, self.centralwidget)
+        self.layout.addWidget(self.resultsListView)
         
-        self.verticalLayout.addWidget(self.viewStack)
+        self.statusLabel = QLabel() # This is piped to StatsLabel but not displayed here anymore
+        
         self.setCentralWidget(self.centralwidget)
         self._setupActions()
         self._setupMenu()
-        self.statusbar = QStatusBar(self)
-        self.statusbar.setSizeGripEnabled(True)
-        self.setStatusBar(self.statusbar)
-        self.statusLabel = QLabel(self)
-        self.statusbar.addPermanentWidget(self.statusLabel, 1)
 
         if self.app.prefs.resultWindowIsMaximized:
             self.setWindowState(self.windowState() | Qt.WindowMaximized)
         else:
             if self.app.prefs.resultWindowRect is not None:
                 self.setGeometry(self.app.prefs.resultWindowRect)
-                # if not on any screen move to center of default screen
-                # moves to center of closest screen if partially off screen
-                frame = self.frameGeometry()
-                if QDesktopWidget().screenNumber(self) == -1:
-                    move_to_screen_center(self)
-                elif QDesktopWidget().availableGeometry(self).contains(frame) is False:
-                    frame.moveCenter(QDesktopWidget().availableGeometry(self).center())
-                    self.move(frame.topLeft())
             else:
+                self.resize(1000, 800)
                 move_to_screen_center(self)
+
+    def reloadResults(self):
+        """Update the results list view when model reloads."""
+        self.resultsListView.reload(self.app.model.results)
 
     # --- Private
     def _update_column_actions_status(self):

@@ -29,19 +29,10 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-:: Install/update requirements
 echo [dupeGuru] Checking and installing requirements...
 python -m pip install -r requirements.txt
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to install requirements.
-    pause
-    exit /b 1
-)
-
-echo [dupeGuru] Installing build requirements...
-python -m pip install -r requirements-build.txt
-if %errorlevel% neq 0 (
-    echo [ERROR] Failed to install build requirements.
     pause
     exit /b 1
 )

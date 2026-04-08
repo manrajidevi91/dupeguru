@@ -80,22 +80,17 @@ class DupeGuru(QObject):
             # Use modern SidebarWindow as the default main window
             self.main_window = SidebarWindow(self)
             parent_window = self.main_window
-            # Create dashboard as the main landing page
-            self.dashboard = self.main_window.create_page("Dashboard", app=self)
+            # Create welcome view as the main landing page
+            self.welcome_page = self.main_window.create_page("WelcomeView", app=self)
             # Keep directories dialog accessible
             self.directories_dialog = self.main_window.create_page("DirectoriesDialog", app=self)
             self.actionDirectoriesWindow.setEnabled(True)
         else:  # floating windows only
             self.main_window = None
-            # Dashboard becomes main window
-            self.dashboard = Dashboard(self)
-            self.dashboard.setWindowTitle(self.NAME)
-            parent_window = self.dashboard
-            # Directories dialog is separate but accessible
+            # Standard landing is directories dialog in old mode
             self.directories_dialog = DirectoriesDialog(self)
-
-        # Wire up dashboard signals
-        self._setup_dashboard_connections()
+            self.directories_dialog.setWindowTitle(self.NAME)
+            parent_window = self.directories_dialog
 
         self.progress_window = ProgressWindow(parent_window, self.model.progress_window)
         self.problemDialog = ProblemDialog(parent=parent_window, model=self.model.problem_dialog)
@@ -172,6 +167,20 @@ class DupeGuru(QObject):
                 "",
                 tr("Open Debug Log"),
                 self.openDebugLogTriggered,
+            ),
+            (
+                "actionStartScanning",
+                "Ctrl+Enter",
+                "",
+                tr("Start Scanning"),
+                self.startScanningTriggered,
+            ),
+            (
+                "actionAddDirectory",
+                "Ctrl+A",
+                "",
+                tr("Add Directory..."),
+                self.addDirectoryTriggered,
             ),
         ]
         create_actions(ACTIONS, self)
@@ -338,6 +347,24 @@ class DupeGuru(QObject):
         debug_log_path = op.join(self.model.appdata, "debug.log")
         desktop.open_path(debug_log_path)
 
+    def startScanningTriggered(self):
+        if not self.model.directories:
+            self.show_message(tr("Please add at least one directory to scan."))
+            return
+        self.model.scan()
+
+    def addDirectoryTriggered(self):
+        # reuse the logic from directories_dialog if possible, or just call model
+        flags = QFileDialog.ShowDirsOnly
+        # Using a proper parent window for the dialog
+        parent = QApplication.activeWindow()
+        directory = QFileDialog.getExistingDirectory(parent, tr("Select Directory"), "", flags)
+        if directory:
+            self.model.add_directory(directory)
+            # Notify any listeners (like sidebar)
+            if hasattr(self, 'main_window') and hasattr(self.main_window, '_update_sidebar_folders'):
+                self.main_window._update_sidebar_folders()
+
     def preferencesTriggered(self):
         preferences_dialog = self._get_preferences_dialog_class()(
             self.main_window if self.main_window else self.directories_dialog, self
@@ -436,16 +463,6 @@ class DupeGuru(QObject):
             destination = f"{destination}.{extension}"
         return destination
 
-    # --- Dashboard Integration
-    def _setup_dashboard_connections(self):
-        """Wire up dashboard signals to app handlers."""
-        if getattr(self, 'dashboard', None) is not None:
-            self.dashboard.startScanRequested.connect(self._on_dashboard_start_scan)
-            self.dashboard.loadResultsRequested.connect(self._on_dashboard_load_results)
-            self.dashboard.showDirectoriesRequested.connect(self.showDirectoriesWindow)
-            self.dashboard.showPreferencesRequested.connect(self.preferencesTriggered)
-            self.dashboard.foldersDropped.connect(self._on_dashboard_folders_dropped)
-            self.dashboard.showPresetsRequested.connect(self.showPresetDialog)
 
     def _on_recent_results_changed(self):
         """Handle changes to recent results list."""

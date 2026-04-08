@@ -1,8 +1,22 @@
+# dupeGuru Unified Requirements File
+# -----------------------------------
+
+# Core Runtime Dependencies
 distro>=1.9.0,<2.0.0
 mutagen>=1.47.0,<2.0.0
 polib>=1.2.0,<2.0.0
-PyQt5 >=5.15.0,<5.15.11; sys_platform != 'linux'
+PyQt5>=5.15.0,<5.15.11; sys_platform != 'linux'
 pywin32>=308,<311; sys_platform == 'win32'
 semantic-version>=2.10.0,<3.0.0
 Send2Trash>=1.8.3,<2.1.0
 xxhash>=3.6.0,<4.0.0
+
+# Build and Development Tooling (Modern Stack)
+pip==26.0.1
+setuptools==82.0.1
+wheel==0.46.3
+sphinx==9.1.0
+pytest==9.0.2
+flake8==7.3.0
+black==26.3.1
+pyinstaller==6.19.0
