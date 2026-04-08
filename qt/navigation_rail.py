@@ -123,7 +123,6 @@ class NavigationRail(QWidget):
         self.scroll_layout.setContentsMargins(0, 8, 0, 16)
         self.scroll_layout.setSpacing(12)
         
-        # 1. Application Mode Section
         self._add_section_header(tr("Application Mode"))
         mode_layout = QVBoxLayout()
         mode_layout.setSpacing(2)
@@ -146,33 +145,12 @@ class NavigationRail(QWidget):
         self.scroll_layout.addLayout(mode_layout)
         
         # 2. Folders to Scan Section
-        header_layout = QHBoxLayout()
-        header_layout.setContentsMargins(16, 0, 8, 0)
-        
-        folders_label = QLabel(tr("Folders to Scan"))
-        folders_label.setObjectName("SectionHeader")
-        header_layout.addWidget(folders_label)
-        
-        header_layout.addStretch()
-        
         add_folder_btn = QPushButton(f"+ {tr('Add Folder')}")
         add_folder_btn.setObjectName("AddFolderBtn")
-        add_folder_btn.setStyleSheet("""
-            QPushButton { 
-                background: transparent; 
-                color: #a3c9ff; 
-                font-size: 11px; 
-                font-weight: bold; 
-                border: none;
-                padding-right: 8px;
-            }
-            QPushButton:hover { text-decoration: underline; }
-        """)
         add_folder_btn.setCursor(Qt.PointingHandCursor)
         add_folder_btn.clicked.connect(self.addFolderClicked.emit)
-        header_layout.addWidget(add_folder_btn)
         
-        self.scroll_layout.addLayout(header_layout)
+        self._add_section_header(tr("Folders to Scan"), action_widget=add_folder_btn)
         
         # Folder List
         self.folder_list_layout = QVBoxLayout()
@@ -183,29 +161,30 @@ class NavigationRail(QWidget):
         self._add_section_header(tr("Scan Options"))
         
         options_container = QWidget()
-        options_container.setContentsMargins(16, 0, 16, 0)
         opts_layout = QVBoxLayout(options_container)
+        opts_layout.setContentsMargins(16, 0, 16, 0)
         opts_layout.setSpacing(12)
         
         # Scan Type Dropdown
         type_label = QLabel(tr("Scan Type"))
-        type_label.setStyleSheet("font-size: 11px; color: #71717a; font-weight: bold;")
+        type_label.setObjectName("ScanOptionsLabel")
         opts_layout.addWidget(type_label)
         
         self.scan_type_combo = QComboBox()
+        self.scan_type_combo.setObjectName("NavigationRailDropdown")
         self.scan_type_combo.currentIndexChanged.connect(self.scanTypeChanged.emit)
         opts_layout.addWidget(self.scan_type_combo)
         
         # Threshold Slider
         thresh_header = QHBoxLayout()
         thresh_label = QLabel(tr("Threshold"))
-        thresh_label.setStyleSheet("font-size: 11px; color: #71717a; font-weight: bold;")
+        thresh_label.setObjectName("ScanOptionsLabel")
         thresh_header.addWidget(thresh_label)
         
         thresh_header.addStretch()
         
         self.thresh_value_label = QLabel("95%")
-        self.thresh_value_label.setStyleSheet("font-size: 11px; color: #a3c9ff; font-weight: bold;")
+        self.thresh_value_label.setObjectName("ThresholdValueLabel")
         thresh_header.addWidget(self.thresh_value_label)
         
         opts_layout.addLayout(thresh_header)
@@ -224,18 +203,36 @@ class NavigationRail(QWidget):
         self.scroll_area.setWidget(self.container)
         self.layout.addWidget(self.scroll_area)
         
-        # 4. START SCAN Button (Fixed Bottom)
-        self.start_btn = QPushButton(f"▶ {tr('START SCAN')}")
+        # 4. START SCAN Button (Fixed Bottom with Container)
+        self.start_container = QWidget()
+        self.start_container.setObjectName("StartScanContainer")
+        start_container_layout = QVBoxLayout(self.start_container)
+        start_container_layout.setContentsMargins(16, 12, 16, 12)
+        
+        self.start_btn = QPushButton(tr("START SCAN"))
         self.start_btn.setObjectName("StartScanButton")
         self.start_btn.setCursor(Qt.PointingHandCursor)
         self.start_btn.setFixedHeight(48)
         self.start_btn.clicked.connect(self.startScanClicked.emit)
-        self.layout.addWidget(self.start_btn)
+        start_container_layout.addWidget(self.start_btn)
+        
+        self.layout.addWidget(self.start_container)
 
-    def _add_section_header(self, title):
+    def _add_section_header(self, title, action_widget=None):
+        header_widget = QWidget()
+        header_layout = QHBoxLayout(header_widget)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setSpacing(0)
+        
         label = QLabel(title)
         label.setObjectName("SectionHeader")
-        self.scroll_layout.addWidget(label)
+        header_layout.addWidget(label)
+        
+        if action_widget:
+            header_layout.addStretch()
+            header_layout.addWidget(action_widget)
+            
+        self.scroll_layout.addWidget(header_widget)
 
     def _on_mode_clicked(self, mode_name):
         # Update UI state

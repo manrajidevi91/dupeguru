@@ -38,6 +38,7 @@ class ThemeManager(QObject):
         self.app = app
         self.current_theme = self.THEME_DARK
         self.system_dark_mode = False
+        self._detect_system_theme()
         
         # Color palettes based on New_UI.html design
         self.dark_palette = {
@@ -149,8 +150,14 @@ class ThemeManager(QObject):
     
     def update_system_theme(self):
         """Check system theme preference and update if in auto mode."""
-        # Detect system dark mode
-        # On Windows 11+, check registry or system settings
+        self._detect_system_theme()
+        
+        # If in auto mode, re-apply theme
+        if self.current_theme == self.THEME_AUTO:
+            self.set_theme(self.THEME_AUTO)
+            
+    def _detect_system_theme(self):
+        """Internal detection of system dark mode preference."""
         if plat.ISWINDOWS:
             try:
                 import winreg
@@ -163,16 +170,9 @@ class ThemeManager(QObject):
                 self.system_dark_mode = apps_use_light_theme == 0
                 winreg.CloseKey(registry_key)
             except:
-                # Default to light mode on error
                 self.system_dark_mode = False
         else:
-            # For macOS and Linux, use simple detection
-            # This is a basic implementation - could be enhanced
             self.system_dark_mode = False
-        
-        # If in auto mode, re-apply theme
-        if self.current_theme == self.THEME_AUTO:
-            self.set_theme(self.THEME_AUTO)
     
     def get_color(self, role):
         """Get a color from the current active palette.
@@ -262,7 +262,7 @@ QMenu::item:selected {{
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 1px;
-    padding: 12px 16px 8px 16px;
+    padding: 12px 16px 4px 16px;
     background: transparent;
 }}
 
@@ -301,17 +301,34 @@ QWidget#FolderItem:hover {{
     border: 1px solid {self._qcolor_to_css(palette['outline_variant'])};
 }}
 
+#NavigationRail QPushButton#AddFolderBtn {{
+    background: transparent;
+    color: {self._qcolor_to_css(palette['primary'])};
+    font-size: 11px;
+    font-weight: bold;
+    border: none;
+    padding-right: 16px;
+}}
+
+#NavigationRail QPushButton#AddFolderBtn:hover {{
+    text-decoration: underline;
+}}
+
 /* START SCAN Button */
+QWidget#StartScanContainer {{
+    border-top: 1px solid {self._qcolor_to_css(palette['indented_line'])};
+    background: transparent;
+}}
 QPushButton#StartScanButton {{
     background: {palette['primary_gradient']};
     color: {self._qcolor_to_css(palette['on_primary']) if is_dark else "#ffffff"};
     border: none;
     border-radius: 12px;
-    padding: 12px;
+    padding: 12px 16px;
     font-size: 14px;
     font-weight: 800;
     letter-spacing: 1px;
-    margin: 16px;
+    margin: 0;
 }}
 
 QPushButton#StartScanButton:pressed {{
@@ -319,6 +336,24 @@ QPushButton#StartScanButton:pressed {{
 }}
 
 /* Scan Options Controls */
+QLabel#ScanOptionsLabel {{
+    font-size: 11px;
+    color: {self._qcolor_to_css(palette['on_surface_variant'])};
+    font-weight: bold;
+    background: transparent;
+}}
+
+QLabel#ThresholdValueLabel {{
+    font-size: 11px;
+    color: {self._qcolor_to_css(palette['primary'])};
+    font-weight: bold;
+    background: transparent;
+}}
+
+QComboBox#NavigationRailDropdown {{
+    margin: 4px 0;
+}}
+
 QComboBox {{
     background-color: {self._qcolor_to_css(palette['surface_container_low'])};
     border: 1px solid {self._qcolor_to_css(palette['outline_variant'])};
