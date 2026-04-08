@@ -116,6 +116,8 @@ class DupeGuru(QObject):
 
         parent_window.show()
         self.model.load()
+        if hasattr(self, 'main_window') and hasattr(self.main_window, '_update_sidebar_folders'):
+            self.main_window._update_sidebar_folders()
 
         self.SIGTERM.connect(self.handleSIGTERM)
 

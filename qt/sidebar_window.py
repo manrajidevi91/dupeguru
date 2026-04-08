@@ -195,6 +195,9 @@ class SidebarWindow(QMainWindow):
         parent = QApplication.activeWindow()
         directory = QFileDialog.getExistingDirectory(parent, tr("Select Directory"), "", flags)
         if directory:
+            # Defensive check: avoid redundant add calls if folder is already there
+            if any(str(f) == directory for f in self.app.model.directories):
+                return
             self.app.model.add_directory(directory)
             self._update_sidebar_folders()
 
@@ -494,6 +497,8 @@ class SidebarWindow(QMainWindow):
     
     def closeEvent(self, close_event):
         """Handle close event."""
+        # Save model data (directories, ignore list, etc.)
+        self.app.model.save()
         # Force closing of widgets in reverse order
         for index in range(self.get_count() - 1, -1, -1):
             widget = self.get_widget_at_index(index)
