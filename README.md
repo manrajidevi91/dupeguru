@@ -58,24 +58,27 @@ dupeGuru comes with a makefile that can be used to build and run:
     $ cd <dupeGuru directory>
     $ python3 -m venv --system-site-packages ./env
     $ source ./env/bin/activate
-    $ pip install -r requirements.txt
+    $ python -m pip install --upgrade pip setuptools wheel
+    $ pip install -r requirements.txt -r requirements-build.txt
     $ python build.py
     $ python run.py
 
+See `DEPENDENCIES.md` for the runtime/build/tooling split and version matrix.
+
 ### Generating Debian/Ubuntu package
-To generate packages the extra requirements in requirements-extra.txt must be installed, the
+To generate packages, install the build requirements plus the extra packaging helpers. The
 steps are as follows:
 
     $ cd <dupeGuru directory>
     $ python3 -m venv --system-site-packages ./env
     $ source ./env/bin/activate
-    $ pip install -r requirements.txt -r requirements-extra.txt
+    $ pip install -r requirements.txt -r requirements-build.txt -r requirements-extra.txt
     $ python build.py --clean
     $ python package.py
 
 This can be made a one-liner (once in the directory) as:
 
-    $ bash -c "python3 -m venv --system-site-packages env && source env/bin/activate && pip install -r requirements.txt -r requirements-extra.txt && python build.py --clean && python package.py"
+    $ bash -c "python3 -m venv --system-site-packages env && source env/bin/activate && pip install -r requirements.txt -r requirements-build.txt -r requirements-extra.txt && python build.py --clean && python package.py"
 
 ## Running tests
 
@@ -87,7 +90,9 @@ run `tox`.
 
 You can also run automated tests without Tox. Extra requirements for running tests are in
 `requirements-extra.txt`. So, you can do `pip install -r requirements-extra.txt` inside your
-virtualenv and then `py.test core hscommon`
+virtualenv and then `pytest core hscommon`
+
+For linting and docs on the modern toolchain, use `requirements-modern.txt` with Python 3.12+.
 
 [dupeguru]: https://dupeguru.voltaicideas.net/
 [cross-toolkit]: http://www.hardcoded.net/articles/cross-toolkit-software

@@ -1,0 +1,2 @@
+# Legacy build dependency set for the Python 3.7 compatibility line.
+sphinx>=5.3.0,<8.0.0

@@ -10,7 +10,6 @@ from optparse import OptionParser
 import shutil
 from multiprocessing import Pool
 
-from hscommon import sphinxgen
 from hscommon.build import (
     add_to_pythonpath,
     print_and_do,
@@ -61,6 +60,7 @@ def parse_args():
 
 
 def build_one_help(language):
+    sphinxgen = _require_sphinxgen()
     print(f"Generating Help in {language}")
     current_path = Path(".").absolute()
     changelog_path = current_path.joinpath("help", "changelog")
@@ -82,10 +82,23 @@ def build_one_help(language):
 
 
 def build_help():
+    _require_sphinxgen()
     languages = ["en", "de", "fr", "hy", "ru", "uk"]
     # Running with Pools as for some reason sphinx seems to cross contaminate the output otherwise
     with Pool(len(languages)) as p:
         p.map(build_one_help, languages)
+
+
+def _require_sphinxgen():
+    try:
+        from hscommon import sphinxgen
+    except ImportError as exc:
+        raise SystemExit(
+            "Missing documentation build dependency: sphinx.\n"
+            "Install `requirements-build.txt` for the legacy build path or "
+            "`requirements-modern.txt` on Python 3.12+."
+        ) from exc
+    return sphinxgen
 
 
 def build_localizations():
@@ -118,7 +131,26 @@ def build_normpo():
 def build_pe_modules():
     print("Building PE Modules")
     # Leverage setup.py to build modules
-    subprocess.check_call([sys.executable, "setup.py", "build_ext", "--inplace"])
+    cmd = [sys.executable, "setup.py", "build_ext", "--inplace"]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.stdout:
+        print(result.stdout, end="" if result.stdout.endswith("\n") else "\n")
+    if result.stderr:
+        print(result.stderr, end="" if result.stderr.endswith("\n") else "\n", file=sys.stderr)
+    if result.returncode != 0:
+        combined_output = f"{result.stdout}\n{result.stderr}"
+        if "No module named 'setuptools'" in combined_output or 'No module named "setuptools"' in combined_output:
+            raise SystemExit(
+                "Missing Python build dependency: setuptools.\n"
+                "Run `python -m pip install --upgrade pip setuptools wheel` in the active virtual environment, "
+                "then retry the build."
+            )
+        raise subprocess.CalledProcessError(
+            result.returncode,
+            cmd,
+            output=result.stdout,
+            stderr=result.stderr,
+        )
 
 
 def build_normal():

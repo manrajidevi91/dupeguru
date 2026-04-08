@@ -9,9 +9,9 @@
 
 NOTE: When installing Visual Studio or the Visual Studio Build Tools with the Windows 10 SDK on versions of Windows below 10 be sure to make sure that the Universal CRT is installed before installing Visual studio as noted in the [Windows 10 SDK Notes][win10sdk] and found at [KB2999226][KB2999226].
 
-After installing python it is recommended to update setuptools before compiling packages.  To update run (example is for python launcher and 3.8):
+Before compiling packages, upgrade pip, setuptools, and wheel in the active virtual environment.  For example:
 
-    $ py -3.8 -m pip install --upgrade setuptools
+    $ py -3.8 -m pip install --upgrade pip setuptools wheel
 
 More details on setting up python for compiling packages on windows can be found on the [python wiki][pythonWindowsCompilers] Take note of the required vc++ versions.
 
@@ -21,9 +21,12 @@ To build with a different python version 3.7 vs 3.8 or 32 bit vs 64 bit specify 
     $ cd <dupeGuru directory>
     $ py -3.8 -m venv .\env
     $ .\env\Scripts\activate
-    $ pip install -r requirements.txt
+    $ python -m pip install --upgrade pip setuptools wheel
+    $ pip install -r requirements.txt -r requirements-build.txt
     $ python build.py
     $ python run.py
+
+See `DEPENDENCIES.md` for the runtime/build/tooling split and version matrix.
 
 ### With makefile
 It is possible to build dupeGuru with the makefile on windows using a compatable POSIX environment.  The following steps have been tested using [msys2][msys2]. Before running make:
@@ -38,7 +41,7 @@ Then the following execution of the makefile should work.  Pass the correct valu
     $ make run
 
 ### Generate Windows Installer Packages
-You need to use the respective x86 or x64 version of python to build the 32 bit and 64 bit versions.  The build scripts will automatically detect the python architecture for you. When using build.py make sure the resulting python works before continuing to package.py.  NOTE: package.py looks for the 'makensis' executable in the default location for a 64 bit windows system.  The extra requirements need to be installed to run packaging: `pip install -r requirements-extra.txt`. Run the following in the respective virtual environment.
+You need to use the respective x86 or x64 version of python to build the 32 bit and 64 bit versions.  The build scripts will automatically detect the python architecture for you. When using build.py make sure the resulting python works before continuing to package.py.  NOTE: package.py looks for the 'makensis' executable in the default location for a 64 bit windows system.  The extra requirements need to be installed to run packaging: `pip install -r requirements-extra.txt`. The build requirements must also be present for help generation: `pip install -r requirements-build.txt`. Run the following in the respective virtual environment.
 
     $ python package.py
 
