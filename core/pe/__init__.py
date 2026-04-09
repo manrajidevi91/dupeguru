@@ -6,6 +6,5 @@ from core.pe import (  # noqa
     matchexif,
     photo,
     prioritize,
-    result_table,
     scanner,
 )

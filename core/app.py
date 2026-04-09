@@ -193,7 +193,8 @@ class DupeGuru(Broadcaster):
             result = cmp_value(dupe, key)
         if delta:
             refval = cmp_value(get_group().ref, key)
-            if key in self.result_table.DELTA_COLUMNS:
+            # DELTA_COLUMNS check was GUI specific, we skip or use a default list for headless mode
+            if key in {'size'}:
                 result -= refval
             else:
                 same = cmp_value(dupe, key) == refval
@@ -255,13 +256,13 @@ class DupeGuru(Broadcaster):
             return None
 
     def _get_export_data(self):
-        columns = [col for col in self.result_table._columns.ordered_columns if col.visible and col.name != "marked"]
-        colnames = [col.display for col in columns]
+        # Result table is gone, use all relevant metadata fields for export
+        colnames = self.METADATA_TO_READ
         rows = []
         for group_id, group in enumerate(self.results.groups):
             for dupe in group:
                 data = self.get_display_info(dupe, group)
-                row = [fix_surrogate_encoding(data[col.name]) for col in columns]
+                row = [fix_surrogate_encoding(str(data.get(name, ""))) for name in colnames]
                 row.insert(0, group_id)
                 rows.append(row)
         return colnames, rows
@@ -608,7 +609,7 @@ class DupeGuru(Broadcaster):
 
     def get_display_info(self, dupe, group, delta=False):
         def empty_data():
-            return {c.name: "---" for c in self.result_table.COLUMNS[1:]}
+            return {name: "---" for name in self.METADATA_TO_READ}
 
         if (dupe is None) or (group is None):
             return empty_data()

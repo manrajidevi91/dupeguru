@@ -1,1 +1,1 @@
-from core.me import fs, prioritize, result_table, scanner  # noqa
+from core.me import fs, prioritize, scanner  # noqa
