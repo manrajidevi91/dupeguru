@@ -156,46 +156,85 @@ def export_excel():
         groups = data.get('groups', [])
         
         from openpyxl import Workbook
-        from openpyxl.styles import Font, Alignment, PatternFill
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
         from io import BytesIO
         
         wb = Workbook()
         ws = wb.active
         ws.title = "Duplicate Report"
         
+        # Color Palette (Modern Pastels)
+        palette = [
+            "EBF2FF", # Soft Blue
+            "F0FFF4", # Hint of Mint
+            "FFF5F5", # Soft Rose
+            "FAF5FF", # Lavender
+            "FFFFF0", # Ivory
+            "F0FBFF", # Sky
+            "FFF9E6", # Champagne
+        ]
+        
+        # Borders
+        thin_border = Border(
+            left=Side(style='thin', color='E2E8F0'),
+            right=Side(style='thin', color='E2E8F0'),
+            top=Side(style='thin', color='E2E8F0'),
+            bottom=Side(style='thin', color='E2E8F0')
+        )
+
         # Headers
-        headers = ["Group ID", "Retained Master File (Path)", "Deleted Duplicate File (Path)"]
+        headers = ["Group ID", "Retained Master File", "Deleted Duplicate File"]
         ws.append(headers)
         
         # Style headers
-        header_fill = PatternFill(start_color="3B82F6", end_color="3B82F6", fill_type="solid")
-        header_font = Font(color="FFFFFF", bold=True)
+        header_fill = PatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid")
+        header_font = Font(color="FFFFFF", bold=True, size=11)
         for cell in ws[1]:
             cell.fill = header_fill
             cell.font = header_font
-            cell.alignment = Alignment(horizontal="center")
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            cell.border = thin_border
+        
+        ws.row_dimensions[1].height = 25
 
-        for group in groups:
+        for i, group in enumerate(groups):
             group_id = group.get('group_id')
-            master = group.get('master_path')
+            # Extract only filename
+            master = os.path.basename(group.get('master_path', ''))
             dupes = group.get('duplicates', [])
             
             if not dupes:
                 continue
+            
+            # Pick a color for this group
+            fill_color = palette[i % len(palette)]
+            group_fill = PatternFill(start_color=fill_color, end_color=fill_color, fill_type="solid")
+            content_font = Font(size=10, color="1E293B")
+            
+            for dupe_path in dupes:
+                # Extract only filename
+                dupe_name = os.path.basename(dupe_path)
                 
-            for dupe in dupes:
-                ws.append([group_id, master, dupe])
-        
+                ws.append([group_id, master, dupe_name])
+                
+                # Apply styling to the newly added row
+                for cell in ws[ws.max_row]:
+                    cell.fill = group_fill
+                    cell.font = content_font
+                    cell.border = thin_border
+                    cell.alignment = Alignment(vertical="center", indent=1)
+
         # Auto-adjust columns width
-        for col in ws.columns:
-            max_length = 0
+        column_widths = [10, 40, 40] # Default minimums
+        for i, col in enumerate(ws.columns):
+            max_length = column_widths[i]
             column = col[0].column_letter
             for cell in col:
                 try:
                     if cell.value and len(str(cell.value)) > max_length:
                         max_length = len(str(cell.value))
                 except: pass
-            ws.column_dimensions[column].width = min(max_length + 2, 100)
+            ws.column_dimensions[column].width = min(max_length + 4, 80)
 
         out = BytesIO()
         wb.save(out)
@@ -205,7 +244,7 @@ def export_excel():
             out,
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             as_attachment=True,
-            download_name='dupeGuru_Report.xlsx'
+            download_name='dupeGuru_Audit_Report.xlsx'
         )
     except Exception as e:
         logger.error(f"Excel export failed: {e}")
