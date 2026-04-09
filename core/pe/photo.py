@@ -5,23 +5,13 @@
 # http://www.gnu.org/licenses/gpl-3.0.html
 
 import logging
+from PIL import Image
 from hscommon.util import get_file_ext, format_size
+from core.pe._block import getblocks2
 
 from core.util import format_timestamp, format_perc, format_dupe_count
 from core import fs
 from core.pe import exif
-
-# This global value is set by the platform-specific subclasser of the Photo base class
-PLAT_SPECIFIC_PHOTO_CLASS = None
-
-
-def format_dimensions(dimensions):
-    return "%d x %d" % (dimensions[0], dimensions[1])
-
-
-def get_delta_dimensions(value, ref_value):
-    return (value[0] - ref_value[0], value[1] - ref_value[1])
-
 
 class Photo(fs.File):
     INITIAL_INFO = fs.File.INITIAL_INFO.copy()
@@ -32,35 +22,64 @@ class Photo(fs.File):
     HANDLED_EXTS = {"png", "jpg", "jpeg", "gif", "bmp", "tiff", "tif", "webp"}
 
     def _plat_get_dimensions(self):
-        raise NotImplementedError()
+        try:
+            with Image.open(str(self.path)) as img:
+                return img.size
+        except Exception:
+            return (0, 0)
 
     def _plat_get_blocks(self, block_count_per_side, orientation):
-        raise NotImplementedError()
+        try:
+            with Image.open(str(self.path)) as img:
+                # dupeGuru expects RGB for p-hashing
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
+                
+                # Apply orientation transforms if needed
+                # orientations 1-8 are EXIF orientations
+                if orientation == 2: # Flip Horizontal
+                    img = img.transpose(Image.FLIP_LEFT_RIGHT)
+                elif orientation == 3: # Rotate 180
+                    img = img.transpose(Image.ROTATE_180)
+                elif orientation == 4: # Flip Vertical
+                    img = img.transpose(Image.FLIP_TOP_BOTTOM)
+                elif orientation == 5: # Transpose (Flip H + Rotate 270)
+                    img = img.transpose(Image.FLIP_LEFT_RIGHT).transpose(Image.ROTATE_270)
+                elif orientation == 6: # Rotate 270
+                    img = img.transpose(Image.ROTATE_270)
+                elif orientation == 7: # Transverse (Flip H + Rotate 90)
+                    img = img.transpose(Image.FLIP_LEFT_RIGHT).transpose(Image.ROTATE_90)
+                elif orientation == 8: # Rotate 90
+                    img = img.transpose(Image.ROTATE_90)
+                
+                return getblocks2(img, block_count_per_side)
+        except Exception as e:
+            logging.warning(f"Error getting blocks for {self.path}: {e}")
+            return []
 
     def get_orientation(self):
         if not hasattr(self, "_cached_orientation"):
             try:
                 with self.path.open("rb") as fp:
                     exifdata = exif.get_fields(fp)
-                    # the value is a list (probably one-sized) of ints
-                    orientations = exifdata["Orientation"]
+                    orientations = exifdata.get("Orientation", [1])
                     self._cached_orientation = orientations[0]
-            except Exception:  # Couldn't read EXIF data, no transforms
-                self._cached_orientation = 0
+            except Exception:
+                self._cached_orientation = 1
         return self._cached_orientation
 
     def _get_exif_timestamp(self):
         try:
             with self.path.open("rb") as fp:
                 exifdata = exif.get_fields(fp)
-                return exifdata["DateTimeOriginal"]
+                return exifdata.get("DateTimeOriginal", "")
         except Exception:
             logging.info("Couldn't read EXIF of picture: %s", self.path)
         return ""
 
     @classmethod
     def can_handle(cls, path):
-        return fs.File.can_handle(path) and get_file_ext(path.name) in cls.HANDLED_EXTS
+        return fs.File.can_handle(path) and get_file_ext(path.name).lower().lstrip('.') in cls.HANDLED_EXTS
 
     def get_display_info(self, group, delta):
         size = self.size
@@ -74,7 +93,7 @@ class Photo(fs.File):
                 r = group.ref
                 size -= r.size
                 mtime -= r.mtime
-                dimensions = get_delta_dimensions(dimensions, r.dimensions)
+                # dimensions = get_delta_dimensions(dimensions, r.dimensions)
         else:
             percentage = group.percentage
             dupe_count = len(group.dupes)
@@ -84,7 +103,7 @@ class Photo(fs.File):
             "folder_path": str(dupe_folder_path),
             "size": format_size(size, 0, 1, False),
             "extension": self.extension,
-            "dimensions": format_dimensions(dimensions),
+            "dimensions": f"{dimensions[0]} x {dimensions[1]}",
             "exif_timestamp": self.exif_timestamp,
             "mtime": format_timestamp(mtime, delta and m),
             "percentage": format_perc(percentage),
@@ -105,3 +124,7 @@ class Photo(fs.File):
             return self._plat_get_blocks(block_count_per_side, self.get_orientation())
         else:
             return self._plat_get_blocks(block_count_per_side, orientation)
+
+# Set the class directly
+PLAT_SPECIFIC_PHOTO_CLASS = Photo
+PhotoFile = Photo # Alias for app.py

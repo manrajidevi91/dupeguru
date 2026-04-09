@@ -94,8 +94,8 @@ class SqliteCache:
             )
         try:
             self.con.execute(sql, blocks + [mtime, path_str])
-        except sqlite.OperationalError:
-            logging.warning("Picture cache could not set value for key %r", path_str)
+        except sqlite.OperationalError as e:
+            logging.warning("Picture cache could not set value for key %r: %s", path_str, e)
         except sqlite.DatabaseError as e:
             logging.warning("DatabaseError while setting value for key %r: %s", path_str, str(e))
 

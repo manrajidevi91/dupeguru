@@ -109,3 +109,4 @@ cocoa/autogen
 *.waf*
 .lock-waf*
 /tags
+Test

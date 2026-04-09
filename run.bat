@@ -37,19 +37,9 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-:: Run build script
-:: Note: This compiles resources and help files.
-echo [dupeGuru] Building resources and translations...
-python build.py
-if %errorlevel% neq 0 (
-    echo [ERROR] Build step failed. See the output above for the exact cause.
-    pause
-    exit /b 1
-)
-
-:: Run dupeGuru GUI
-echo [dupeGuru] Starting application...
-python run.py
+:: Run dupeGuru Flask Web App
+echo [dupeGuru] Starting web application on http://localhost:5010...
+python app.py
 
 if %errorlevel% neq 0 (
     echo [ERROR] dupeGuru exited with code %errorlevel%.

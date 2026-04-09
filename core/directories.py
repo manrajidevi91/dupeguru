@@ -61,6 +61,10 @@ class Directories:
         self.states = {}
         self._exclude_list = exclude_list
 
+    def clear(self):
+        self._dirs = []
+        self.states = {}
+
     def __contains__(self, path):
         for p in self._dirs:
             if path == p or p in path.parents:

@@ -180,6 +180,10 @@ class DupeGuru(Broadcaster):
         for child in children:
             child.connect()
 
+    def clear_directories(self):
+        self.directories.clear()
+        self.notify("directories_changed")
+
     # --- Private
     def _recreate_result_table(self):
         if self.result_table is not None:
