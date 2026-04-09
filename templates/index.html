@@ -245,6 +245,11 @@
                 </div>
                 <div class="flex items-center gap-3">
                     <div class="flex bg-slate-900/80 backdrop-blur-md border border-white/5 p-1 rounded-2xl">
+                        <button id="exportExcelBtn" class="flex items-center gap-2 px-4 py-2 hover:bg-white/5 text-emerald-400 rounded-xl text-xs font-semibold transition-all">
+                            <span class="material-symbols-rounded text-lg">description</span>
+                            Report
+                        </button>
+                        <div class="w-px h-4 bg-white/5 self-center mx-1"></div>
                         <button id="markSelectedBtn" class="flex items-center gap-2 px-4 py-2 hover:bg-white/5 text-slate-300 rounded-xl text-xs font-semibold transition-all">
                             <span class="material-symbols-rounded text-lg">done_all</span>
                             Select All
@@ -316,7 +321,8 @@
             thresholdVal: document.getElementById('thresholdVal'),
             folderCountLabel: document.getElementById('folderCountLabel'),
             deleteSelectedBtn: document.getElementById('deleteSelectedBtn'),
-            markSelectedBtn: document.getElementById('markSelectedBtn')
+            markSelectedBtn: document.getElementById('markSelectedBtn'),
+            exportExcelBtn: document.getElementById('exportExcelBtn')
         };
 
         async function browseNative() {
@@ -573,7 +579,57 @@
                 `}).join('');
         }
 
+        async function exportResults() {
+            if (state.results.length === 0) {
+                showNotification('No data to export', 'warning');
+                return;
+            }
+
+            // Map results to identify which duplicates are selected for deletion
+            const exportData = state.results.map(group => {
+                const groupContainer = Array.from(elements.resultsGrid.querySelectorAll('.group-container'))
+                    .find(c => c.querySelector('h3').textContent.includes(` ${group.ref.name}`));
+                
+                const selectedDupes = group.duplicates.filter(dupe => {
+                    const cb = groupContainer.querySelector(`input[data-path="${dupe.path.replace(/\\/g, '\\\\')}"]`);
+                    return cb && cb.checked;
+                });
+
+                return {
+                    group_id: group.id,
+                    master_path: group.ref.path,
+                    master_name: group.ref.name,
+                    duplicates: selectedDupes.map(d => d.path)
+                };
+            });
+
+            try {
+                const res = await fetch('/api/export_excel', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ groups: exportData })
+                });
+
+                if (res.ok) {
+                    const blob = await res.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `dupeGuru_Report_${new Date().getTime()}.xlsx`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    showNotification('Report generated successfully');
+                } else {
+                    showNotification('Failed to generate report', 'error');
+                }
+            } catch (e) {
+                showNotification('Export failed', 'error');
+            }
+        }
+
         // Action Handlers
+        elements.exportExcelBtn.addEventListener('click', exportResults);
         elements.browseBtn.addEventListener('click', browseNative);
         elements.folderPathInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') addFolder(); });
         elements.startScanBtn.addEventListener('click', startScan);

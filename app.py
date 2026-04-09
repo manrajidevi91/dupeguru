@@ -149,6 +149,68 @@ def get_image():
         return send_file(path)
     return "Not Found", 404
 
+@app.route('/api/export_excel', methods=['POST'])
+def export_excel():
+    try:
+        data = request.json
+        groups = data.get('groups', [])
+        
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill
+        from io import BytesIO
+        
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Duplicate Report"
+        
+        # Headers
+        headers = ["Group ID", "Retained Master File (Path)", "Deleted Duplicate File (Path)"]
+        ws.append(headers)
+        
+        # Style headers
+        header_fill = PatternFill(start_color="3B82F6", end_color="3B82F6", fill_type="solid")
+        header_font = Font(color="FFFFFF", bold=True)
+        for cell in ws[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center")
+
+        for group in groups:
+            group_id = group.get('group_id')
+            master = group.get('master_path')
+            dupes = group.get('duplicates', [])
+            
+            if not dupes:
+                continue
+                
+            for dupe in dupes:
+                ws.append([group_id, master, dupe])
+        
+        # Auto-adjust columns width
+        for col in ws.columns:
+            max_length = 0
+            column = col[0].column_letter
+            for cell in col:
+                try:
+                    if cell.value and len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except: pass
+            ws.column_dimensions[column].width = min(max_length + 2, 100)
+
+        out = BytesIO()
+        wb.save(out)
+        out.seek(0)
+        
+        return send_file(
+            out,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name='dupeGuru_Report.xlsx'
+        )
+    except Exception as e:
+        logger.error(f"Excel export failed: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route('/api/delete', methods=['POST'])
 def delete_files():
     data = request.json
