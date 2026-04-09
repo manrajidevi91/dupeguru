@@ -7,6 +7,7 @@
 from hscommon.trans import tr
 
 from core.scanner import Scanner as ScannerBase, ScanOption, ScanType
+from core.me import matchfp
 
 
 class ScannerME(ScannerBase):
@@ -17,9 +18,15 @@ class ScannerME(ScannerBase):
     @staticmethod
     def get_scan_options():
         return [
+            ScanOption(ScanType.TAG, tr("Tags")),
+            ScanOption(ScanType.AUDIOFP, tr("Audio Fingerprint")),
             ScanOption(ScanType.FILENAME, tr("Filename")),
             ScanOption(ScanType.FIELDS, tr("Filename - Fields")),
             ScanOption(ScanType.FIELDSNOORDER, tr("Filename - Fields (No Order)")),
-            ScanOption(ScanType.TAG, tr("Tags")),
             ScanOption(ScanType.CONTENTS, tr("Contents")),
         ]
+
+    def _getmatches(self, files, j):
+        if self.scan_type == ScanType.AUDIOFP:
+            return matchfp.getmatches(files, self.min_match_percentage, j)
+        return super()._getmatches(files, j)

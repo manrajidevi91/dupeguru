@@ -31,6 +31,13 @@ class ScanType:
     # PE
     FUZZYBLOCK = 10
     EXIFTIMESTAMP = 11
+    PHASH = 12
+    DHASH = 13
+    AHASH = 14
+    HISTOGRAM = 15
+
+    # ME
+    AUDIOFP = 20
 
 
 ScanOption = namedtuple("ScanOption", "scan_type label")

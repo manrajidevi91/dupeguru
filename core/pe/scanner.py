@@ -8,7 +8,7 @@ from hscommon.trans import tr
 
 from core.scanner import Scanner, ScanType, ScanOption
 
-from core.pe import matchblock, matchexif
+from core.pe import matchblock, matchexif, matchhash, matchhistogram
 
 
 class ScannerPE(Scanner):
@@ -19,8 +19,13 @@ class ScannerPE(Scanner):
     @staticmethod
     def get_scan_options():
         return [
-            ScanOption(ScanType.FUZZYBLOCK, tr("Contents")),
+            ScanOption(ScanType.FUZZYBLOCK, tr("Fuzzy Block")),
+            ScanOption(ScanType.PHASH, tr("Perceptual Hash")),
+            ScanOption(ScanType.DHASH, tr("Difference Hash")),
+            ScanOption(ScanType.AHASH, tr("Average Hash")),
+            ScanOption(ScanType.HISTOGRAM, tr("Histogram Comparison")),
             ScanOption(ScanType.EXIFTIMESTAMP, tr("EXIF Timestamp")),
+            ScanOption(ScanType.CONTENTS, tr("Contents")),
         ]
 
     def _getmatches(self, files, j):
@@ -33,7 +38,17 @@ class ScannerPE(Scanner):
                 match_rotated=self.match_rotated,
                 j=j,
             )
+        elif self.scan_type == ScanType.PHASH:
+            return matchhash.getmatches_phash(files, self.min_match_percentage, j)
+        elif self.scan_type == ScanType.DHASH:
+            return matchhash.getmatches_dhash(files, self.min_match_percentage, j)
+        elif self.scan_type == ScanType.AHASH:
+            return matchhash.getmatches_ahash(files, self.min_match_percentage, j)
+        elif self.scan_type == ScanType.HISTOGRAM:
+            return matchhistogram.getmatches(files, self.min_match_percentage, j)
         elif self.scan_type == ScanType.EXIFTIMESTAMP:
             return matchexif.getmatches(files, self.match_scaled, j)
+        elif self.scan_type == ScanType.CONTENTS:
+            return super()._getmatches(files, j)
         else:
-            raise ValueError("Invalid scan type")
+            raise ValueError(f"Invalid scan type: {self.scan_type}")

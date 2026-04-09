@@ -326,14 +326,20 @@
                 { id: 4, name: 'Folders' }
             ],
             music: [
-                { id: 3, name: 'Tags (Artist/Album/Title)' },
-                { id: 0, name: 'Filename' },
-                { id: 1, name: 'Filename - Fields' },
-                { id: 5, name: 'Contents' }
+                { id: 3,  name: 'Tags (Artist/Album/Title)' },
+                { id: 20, name: 'Audio Fingerprint (Chromaprint)' },
+                { id: 0,  name: 'Filename' },
+                { id: 1,  name: 'Filename - Fields' },
+                { id: 5,  name: 'Contents (Byte-for-byte)' }
             ],
             picture: [
                 { id: 10, name: 'Fuzzy Block (Visual)' },
-                { id: 11, name: 'EXIF Timestamp' }
+                { id: 12, name: 'Perceptual Hash (pHash)' },
+                { id: 13, name: 'Difference Hash (dHash)' },
+                { id: 14, name: 'Average Hash (aHash)' },
+                { id: 15, name: 'Histogram Comparison' },
+                { id: 11, name: 'EXIF Timestamp' },
+                { id: 5,  name: 'Contents (Exact Hash)' }
             ]
         };
 
@@ -693,9 +699,9 @@
             state.activeAlgorithm = alg;
             
             // Logic for showing similarity slider
-            // FUZZYBLOCK (10), FILENAME (0), FIELDS (1), FIELDSNOORDER (2), TAG (3) all use threshold/logic
-            // CONTENTS (5) and EXIF (11) are typically near-binary or fixed matches
-            const needsThreshold = [10, 0, 1, 2, 3].includes(alg);
+            // Algorithms that need a threshold: 0, 1, 2, 3, 10, 12, 13, 14, 15, 20
+            // Binary/Direct algorithms (4, 5, 11) hide the slider
+            const needsThreshold = [0, 1, 2, 3, 10, 12, 13, 14, 15, 20].includes(alg);
             elements.similarityContainer.classList.toggle('hidden', !needsThreshold);
         }
 
