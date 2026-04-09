@@ -188,14 +188,7 @@
                                 <span class="material-symbols-rounded text-xl">folder_open</span>
                             </button>
                         </div>
-                    </div>
-
-                    <button id="addFolderBtn" class="w-full mt-4 flex items-center justify-center gap-2 py-3 rounded-2xl bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-all font-bold text-sm">
-                        <span class="material-symbols-rounded text-xl">add_circle</span>
-                        ADD DIRECTORY
-                    </button>
-
-                    <div id="foldersList" class="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
+                    <div id="foldersList" class="mt-4 space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
                         <!-- Folders injected here -->
                     </div>
                 </section>
@@ -310,7 +303,6 @@
 
         const elements = {
             folderPathInput: document.getElementById('folderPathInput'),
-            addFolderBtn: document.getElementById('addFolderBtn'),
             browseBtn: document.getElementById('browseBtn'),
             foldersList: document.getElementById('foldersList'),
             startScanBtn: document.getElementById('startScanBtn'),
@@ -583,7 +575,6 @@
 
         // Action Handlers
         elements.browseBtn.addEventListener('click', browseNative);
-        elements.addFolderBtn.addEventListener('click', addFolder);
         elements.folderPathInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') addFolder(); });
         elements.startScanBtn.addEventListener('click', startScan);
         elements.deleteSelectedBtn.addEventListener('click', deleteSelected);
