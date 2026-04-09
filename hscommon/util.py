@@ -8,7 +8,6 @@
 
 from math import ceil
 from pathlib import Path
-from hscommon.path import pathify, log_io_error
 
 from typing import IO, Any, Callable, Generator, Iterable, List, Tuple, Union
 
@@ -79,16 +78,6 @@ def extract(predicate: Callable[[Any], bool], iterable: Iterable[Any]) -> Tuple[
         else:
             shaft.append(item)
     return wheat, shaft
-
-
-def allsame(iterable: Iterable[Any]) -> bool:
-    """Returns whether all elements of 'iterable' are the same."""
-    it = iter(iterable)
-    try:
-        first_item = next(it)
-    except StopIteration:
-        raise ValueError("iterable cannot be empty")
-    return all(element == first_item for element in it)
 
 
 def iterconsume(seq: List[Any], reverse: bool = True) -> Generator[Any, None, None]:
@@ -261,63 +250,3 @@ def multi_replace(s: str, replace_from: Union[str, List[str]], replace_to: Union
 # --- Files related
 
 
-@log_io_error
-@pathify
-def delete_if_empty(path: Path, files_to_delete: List[str] = []) -> bool:
-    """Deletes the directory at 'path' if it is empty or if it only contains files_to_delete."""
-    if not path.exists() or not path.is_dir():
-        return False
-    contents = list(path.glob("*"))
-    if any(p for p in contents if (p.name not in files_to_delete) or p.is_dir()):
-        return False
-    for p in contents:
-        p.unlink()
-    path.rmdir()
-    return True
-
-
-def open_if_filename(
-    infile: Union[Path, str, IO],
-    mode: str = "rb",
-) -> Tuple[IO, bool]:
-    """If ``infile`` is a string, it opens and returns it. If it's already a file object, it simply returns it.
-
-    This function returns ``(file, should_close_flag)``. The should_close_flag is True is a file has
-    effectively been opened (if we already pass a file object, we assume that the responsibility for
-    closing the file has already been taken). Example usage::
-
-        fp, shouldclose = open_if_filename(infile)
-        dostuff()
-        if shouldclose:
-            fp.close()
-    """
-    if isinstance(infile, Path):
-        return (infile.open(mode), True)
-    if isinstance(infile, str):
-        return (open(infile, mode), True)
-    else:
-        return (infile, False)
-
-
-class FileOrPath:
-    """Does the same as :func:`open_if_filename`, but it can be used with a ``with`` statement.
-
-    Example::
-
-        with FileOrPath(infile):
-            dostuff()
-    """
-
-    def __init__(self, file_or_path: Union[Path, str], mode: str = "rb") -> None:
-        self.file_or_path = file_or_path
-        self.mode = mode
-        self.mustclose = False
-        self.fp: Union[IO, None] = None
-
-    def __enter__(self) -> IO:
-        self.fp, self.mustclose = open_if_filename(self.file_or_path, self.mode)
-        return self.fp
-
-    def __exit__(self, exc_type, exc_value, traceback) -> None:
-        if self.fp and self.mustclose:
-            self.fp.close()

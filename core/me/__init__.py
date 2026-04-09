@@ -1,1 +1,1 @@
-from core.me import fs, prioritize, scanner  # noqa
+from core.me import fs, scanner  # noqa

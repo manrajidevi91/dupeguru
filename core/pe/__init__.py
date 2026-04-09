@@ -1,10 +1,10 @@
 from core.pe import (  # noqa
     block,
-    cache,
     exif,
     matchblock,
     matchexif,
+    matchhash,
+    matchhistogram,
     photo,
-    prioritize,
     scanner,
 )
