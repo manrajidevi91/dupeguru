@@ -1,102 +1,83 @@
-# dupeGuru
+# dupeGuru - Web Evolution
 
-[dupeGuru][dupeguru] is a cross-platform (Linux, OS X, Windows) GUI tool to find duplicate files in
-a system. It is written mostly in Python 3 and uses [qt](https://www.qt.io/) for the UI.
+![Project Banner](https://img.shields.io/badge/dupeGuru-v4.0.0_Web-blue?style=for-the-badge&logo=python&logoColor=white)
+![Stack](https://img.shields.io/badge/FLASK-000000?style=for-the-badge&logo=flask&logoColor=white)
+![UI](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
 
-## Current status
-Still looking for additional help especially with regards to:
-* OSX maintenance: reproducing bugs, packaging verification.
-* Linux maintenance: reproducing bugs, maintaining PPA repository, Debian package, rpm package.
-* Translations: updating missing strings, transifex project at https://www.transifex.com/voltaicideas/dupeguru-1
-* Documentation: keeping it up-to-date.
+**dupeGuru** is a powerful cross-platform tool to find duplicate files on your system. This version represents a complete architectural overhaul, evolving from a legacy desktop application into a lean, headless web service with a premium, state-of-the-art interface.
 
-## Contents of this folder
+## 🚀 The Web Evolution
 
-This folder contains the source for dupeGuru. Its documentation is in `help`, but is also
-[available online][documentation] in its built form. Here's how this source tree is organized:
+We've stripped away the PyQt dependencies and legacy GUI code to create a modern, high-performance web experience.
 
-* core: Contains the core logic code for dupeGuru. It's Python code.
-* qt: UI code for the Qt toolkit. It's written in Python and uses PyQt.
-* images: Images used by the different UI codebases.
-* pkg: Skeleton files required to create different packages
-* help: Help document, written for Sphinx.
-* locale: .po files for localization.
-* hscommon: A collection of helpers used across HS applications.
+*   **Headless Architecture**: The core engine now runs as a Flask-based backend, making it deployable on servers or locally.
+*   **Premium Interface**: A stunning dark-mode UI built with TailwindCSS, featuring glassmorphism, fluid animations, and a focus on visual clarity.
+*   **Dynamic Workflows**: Real-time folder management, interactive cluster galleries, and instant similarity adjustments.
+*   **Audit-Ready**: Integrated Excel reporting for safe, documented duplicate management.
 
-## How to build dupeGuru from source
+## 🧠 Advanced Scanning Engines
 
-### Windows & macOS specific additional instructions
-For windows instructions see the [Windows Instructions](Windows.md).
+dupeGuru features three specialized modes, each equipped with industry-leading algorithms:
 
-For macos instructions (qt version) see the [macOS Instructions](macos.md).
+### 📸 Picture Mode (Visual Analysis)
+*   **Fuzzy Block**: Advanced block-based visual comparison.
+*   **Perceptual Hash (pHash)**: Semantic hashing that ignores scaling and minor edits.
+*   **Difference Hash (dHash)**: High-speed gradient-based matching.
+*   **Average Hash (aHash)**: Optimized visual analysis for large collections.
+*   **Histogram Comparison**: Deep color-distribution analysis.
+*   **EXIF Metadata**: Precise matching based on camera timestamps.
+
+### 🎵 Music Mode (Acoustic & Tag Analysis)
+*   **Audio Fingerprinting**: Powered by **Chromaprint** for content-based identification regardless of file name.
+*   **Tag Matching**: Deep analysis of Artist, Album, and Title metadata.
+
+### 📄 Standard Mode (Files & Folders)
+*   **Byte-for-byte**: Guaranteed exact matches using MD5/SHA-1 hashing.
+*   **Filename/Folder Logic**: Smart heuristic matching for file and directory names.
+
+## 🛠️ Technical Stack
+
+*   **Backend**: Python 3.10+ / Flask
+*   **Frontend**: HTML5 / ES6+ JavaScript / TailwindCSS
+*   **Storage**: SQLite (High-speed hashing cache)
+*   **Safety**: `send2trash` integration for non-destructive deletion.
+
+## 🏁 Getting Started
 
 ### Prerequisites
-* [Python 3.7+][python]
-* PyQt5
+*   Python 3.10 or higher.
+*   `pip` for dependency management.
 
-### System Setup
-When running in a linux based environment the following system packages or equivalents are needed to build:
-* python3-pyqt5
-* pyqt5-dev-tools (on some systems, see note)
-* python3-venv (only if using a virtual environment)
-* python3-dev
-* build-essential
+### Installation
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/manrajidevi91/dupeguru.git
+   cd dupeguru
+   ```
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-Note: On some linux systems pyrcc5 is not put on the path when installing python3-pyqt5, this will cause some issues with the resource files (and icons). These systems should have a respective pyqt5-dev-tools package, which should also be installed. The presence of pyrcc5 can be checked with `which pyrcc5`.  Debian based systems need the extra package, and Arch does not.
+### Running the App
+Launch the web server:
+```bash
+python app.py
+```
+Or use the provided batch file on Windows:
+```bash
+run.bat
+```
 
-To create packages the following are also needed:
-* python3-setuptools
-* debhelper
+Open your browser and navigate to:
+**`http://localhost:5010`**
 
-### Building with Make
-dupeGuru comes with a makefile that can be used to build and run:
+## 📂 Project Structure
 
-    $ make && make run
+*   `app.py`: The Flask entry point and RESTful API layer.
+*   `core/`: Optimized scanning logic (ported from original dupeGuru).
+*   `templates/`: Modern web frontend components.
+*   `hscommon/`: Shared utility libraries for cross-toolkit compatibility.
 
-### Building without Make
-
-    $ cd <dupeGuru directory>
-    $ python3 -m venv --system-site-packages ./env
-    $ source ./env/bin/activate
-    $ python -m pip install --upgrade pip setuptools wheel
-    $ pip install -r requirements.txt -r requirements-build.txt
-    $ python build.py
-    $ python run.py
-
-See `DEPENDENCIES.md` for the runtime/build/tooling split and version matrix.
-
-### Generating Debian/Ubuntu package
-To generate packages, install the build requirements plus the extra packaging helpers. The
-steps are as follows:
-
-    $ cd <dupeGuru directory>
-    $ python3 -m venv --system-site-packages ./env
-    $ source ./env/bin/activate
-    $ pip install -r requirements.txt -r requirements-build.txt -r requirements-extra.txt
-    $ python build.py --clean
-    $ python package.py
-
-This can be made a one-liner (once in the directory) as:
-
-    $ bash -c "python3 -m venv --system-site-packages env && source env/bin/activate && pip install -r requirements.txt -r requirements-build.txt -r requirements-extra.txt && python build.py --clean && python package.py"
-
-## Running tests
-
-The complete test suite is run with [Tox 1.7+][tox]. If you have it installed system-wide, you
-don't even need to set up a virtualenv. Just `cd` into the root project folder and run `tox`.
-
-If you don't have Tox system-wide, install it in your virtualenv with `pip install tox` and then
-run `tox`.
-
-You can also run automated tests without Tox. Extra requirements for running tests are in
-`requirements-extra.txt`. So, you can do `pip install -r requirements-extra.txt` inside your
-virtualenv and then `pytest core hscommon`
-
-For linting and docs on the modern toolchain, use `requirements-modern.txt` with Python 3.12+.
-
-[dupeguru]: https://dupeguru.voltaicideas.net/
-[cross-toolkit]: http://www.hardcoded.net/articles/cross-toolkit-software
-[documentation]: http://dupeguru.voltaicideas.net/help/en/
-[python]: http://www.python.org/
-[pyqt]: http://www.riverbankcomputing.com
-[tox]: https://tox.readthedocs.org/en/latest/
+---
+*Maintained with ❤️ for the next generation of file management.*
