@@ -7,14 +7,11 @@
 from hscommon.testutil import TestApp as TestAppBase, CallLogger, eq_, with_app  # noqa
 from pathlib import Path
 from hscommon.util import get_file_ext, format_size
-from hscommon.gui.column import Column
 from hscommon.jobprogress.job import nulljob, JobCancelled
 
 from core import engine, prioritize
 from core.engine import getwords
 from core.app import DupeGuru as DupeGuruBase
-from core.gui.result_table import ResultTable as ResultTableBase
-from core.gui.prioritize_dialog import PrioritizeDialog
 
 
 class DupeGuruView:
@@ -45,17 +42,11 @@ class DupeGuruView:
         pass
 
 
-class ResultTable(ResultTableBase):
-    COLUMNS = [
-        Column("marked", ""),
-        Column("name", "Filename"),
-        Column("folder_path", "Directory"),
-        Column("size", "Size (KB)"),
-        Column("extension", "Kind"),
-    ]
-    DELTA_COLUMNS = {
-        "size",
-    }
+class ResultTable:
+    # Minimal mock for headless testing
+    def __init__(self, app):
+        self.app = app
+        self.DELTA_COLUMNS = {"size"}
 
 
 class DupeGuru(DupeGuruBase):
@@ -65,17 +56,12 @@ class DupeGuru(DupeGuruBase):
     def __init__(self):
         DupeGuruBase.__init__(self, DupeGuruView())
         self.appdata = "/tmp"
-        self._recreate_result_table()
 
     def _prioritization_categories(self):
         return prioritize.all_categories()
 
     def _recreate_result_table(self):
-        if self.result_table is not None:
-            self.result_table.disconnect()
         self.result_table = ResultTable(self)
-        self.result_table.view = CallLogger()
-        self.result_table.connect()
 
 
 class NamedObject:
@@ -148,27 +134,9 @@ class TestApp(TestAppBase):
     __test__ = False
 
     def __init__(self):
-        def link_gui(gui):
-            gui.view = self.make_logger()
-            if hasattr(gui, "_columns"):  # tables
-                gui._columns.view = self.make_logger()
-            return gui
-
         TestAppBase.__init__(self)
         self.app = DupeGuru()
         self.default_parent = self.app
-        self.dtree = link_gui(self.app.directory_tree)
-        self.dpanel = link_gui(self.app.details_panel)
-        self.slabel = link_gui(self.app.stats_label)
-        self.pdialog = PrioritizeDialog(self.app)
-        link_gui(self.pdialog.category_list)
-        link_gui(self.pdialog.criteria_list)
-        link_gui(self.pdialog.prioritization_list)
-        link_gui(self.app.ignore_list_dialog)
-        link_gui(self.app.ignore_list_dialog.ignore_list_table)
-        link_gui(self.app.progress_window)
-        link_gui(self.app.progress_window.jobdesc_textfield)
-        link_gui(self.app.progress_window.progressdesc_textfield)
 
     @property
     def rtable(self):
