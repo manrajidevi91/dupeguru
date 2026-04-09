@@ -9,7 +9,11 @@ from send2trash import send2trash
 # dupeGuru core imports
 from core import fs, scanner, engine
 from core.pe.scanner import ScannerPE
-from core.pe.photo import PhotoFile
+from core.pe.photo import Photo as PhotoFile
+from core.me.scanner import ScannerME
+from core.me.fs import MusicFile
+from core.se.scanner import ScannerSE
+from core.se.fs import File as StandardFile
 
 app = Flask(__name__)
 
@@ -40,7 +44,7 @@ class ScanSession:
     def __init__(self):
         self.folders = []
         self.results = [] # List of groups
-        self.scan_type = scanner.ScanType.FUZZYBLOCK
+        self.scan_type = 10 # Default to FuzzyBlock
         self.threshold = 95
         self.scanning = False
         self.appdata = Path(os.environ.get('APPDATA', '.')) / 'dupeguru-web'
@@ -75,15 +79,29 @@ def manage_folders():
 
 @app.route('/api/scan', methods=['POST'])
 def run_scan():
+    data = request.json or {}
+    mode = data.get('mode', 'picture')
+    algorithm = int(data.get('algorithm', 10))
+    threshold = int(data.get('threshold', 95))
+
     if not session.folders:
         return jsonify({"status": "error", "message": "No folders selected"}), 400
     
     session.scanning = True
     try:
-        # 1. Collect files from folders
+        # 1. Select Engine and File Class
+        if mode == 'music':
+            scanner_cls = ScannerME
+            file_classes = [MusicFile]
+        elif mode == 'standard':
+            scanner_cls = ScannerSE
+            file_classes = [StandardFile]
+        else:
+            scanner_cls = ScannerPE
+            file_classes = [PhotoFile]
+
+        # 2. Collect files from folders
         all_files = []
-        file_classes = [PhotoFile]
-        
         for folder in session.folders:
             folder_path = Path(folder)
             for root, dirs, files in os.walk(folder_path):
@@ -91,20 +109,21 @@ def run_scan():
                     file_path = Path(root) / name
                     try:
                         f = fs.get_file(file_path, file_classes)
-                        if f and PhotoFile.can_handle(file_path):
+                        if f:
                             all_files.append(f)
                     except Exception as e:
                         logger.error(f"Error reading {file_path}: {e}")
 
-        # 2. Run Scanner PE
-        s = ScannerPE()
-        s.scan_type = session.scan_type
-        s.min_match_percentage = session.threshold
-        s.cache_path = session.cache_path
+        # 3. Run Scanner
+        s = scanner_cls()
+        s.scan_type = algorithm
+        s.min_match_percentage = threshold
+        if mode == 'picture':
+            s.cache_path = session.cache_path
         
         groups = s.get_dupe_groups(all_files)
         
-        # 3. Format results for JSON
+        # 4. Format results for JSON
         session.results = []
         for i, group in enumerate(groups):
             group_data = {

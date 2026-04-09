@@ -104,6 +104,13 @@
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
 
+
+        #algorithmSelect option {
+            background-color: #0f172a; /* Slate-900 */
+            color: #f1f5f9; /* Slate-100 */
+            padding: 10px;
+        }
+
         .material-symbols-rounded {
             font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
         }
@@ -158,17 +165,17 @@
                 <section>
                     <label class="text-[10px] uppercase tracking-widest font-bold text-slate-500 mb-4 block px-2">Scanning Engine</label>
                     <div class="space-y-1">
-                        <button class="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 text-slate-400 transition-all group">
+                        <button id="modeStandardBtn" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 text-slate-400 transition-all group"> 
                             <span class="material-symbols-rounded text-xl group-hover:text-blue-400">text_fields</span>
                             <span class="text-sm font-medium">Standard</span>
                         </button>
-                        <button class="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 text-slate-400 transition-all group">
+                        <button id="modeMusicBtn" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 text-slate-400 transition-all group"> 
                             <span class="material-symbols-rounded text-xl group-hover:text-indigo-400">music_note</span>
                             <span class="text-sm font-medium">Music</span>
                         </button>
-                        <button class="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 shadow-lg shadow-blue-500/5">
-                            <span class="material-symbols-rounded text-xl fill-icon">image</span>
-                            <span class="text-sm font-bold">Picture Mode</span>
+                        <button id="modePictureBtn" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 shadow-lg shadow-blue-500/5 transition-all group"> 
+                            <span class="material-symbols-rounded text-xl">image</span>
+                            <span class="text-sm font-medium">Pictures</span>
                         </button>
                     </div>
                 </section>
@@ -188,6 +195,7 @@
                                 <span class="material-symbols-rounded text-xl">folder_open</span>
                             </button>
                         </div>
+                    </div>
                     <div id="foldersList" class="mt-4 space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
                         <!-- Folders injected here -->
                     </div>
@@ -198,21 +206,23 @@
                     <label class="text-[10px] uppercase tracking-widest font-bold text-slate-500 mb-4 block px-2">Parameters</label>
                     <div class="glass-card rounded-2xl p-4 space-y-5">
                         <div class="space-y-1">
-                            <div class="flex justify-between items-center bg-slate-900/50 p-3 rounded-xl border border-white/5 group cursor-pointer hover:border-blue-500/30 transition-all">
-                                <div class="flex flex-col">
+                            <div class="relative flex justify-between items-center bg-slate-900/50 p-3 rounded-xl border border-white/5 group transition-all">
+                                <div class="flex flex-col w-full">
                                     <span class="text-[10px] text-slate-500 font-bold uppercase">Algorithm</span>
-                                    <span class="text-xs font-semibold">FUZZY BLOCK</span>
+                                    <select id="algorithmSelect" class="bg-transparent text-xs font-semibold outline-none w-full cursor-pointer">
+                                        <!-- Options injected by JS -->
+                                    </select>
                                 </div>
-                                <span class="material-symbols-rounded text-slate-600">settings_suggest</span>
                             </div>
                         </div>
-                        <div class="space-y-3">
-                            <div class="flex justify-between items-center">
-                                <span class="text-[10px] text-slate-500 font-bold uppercase">Similarity Threshold</span>
-                                <span id="thresholdVal" class="text-xs font-bold text-blue-400">95%</span>
+
+                        <div id="similarityContainer" class="space-y-2">
+                            <div class="flex justify-between items-center px-1">
+                                <span class="text-[10px] text-slate-500 font-bold uppercase">Similarity</span>
+                                <span id="thresholdVal" class="text-xs font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-lg">95%</span>
                             </div>
-                            <input id="thresholdSlider" type="range" min="0" max="100" value="95" 
-                                class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"/>
+                            <input type="range" id="thresholdSlider" min="50" max="100" value="95" 
+                                class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500 transition-all hover:bg-slate-700">
                         </div>
                     </div>
                 </section>
@@ -304,7 +314,27 @@
             folders: [],
             results: [],
             scanning: false,
-            reportGenerated: false
+            reportGenerated: false,
+            activeMode: 'picture',
+            activeAlgorithm: 10
+        };
+
+        const algorithms = {
+            standard: [
+                { id: 5, name: 'Contents (Byte-for-byte)' },
+                { id: 0, name: 'Filename' },
+                { id: 4, name: 'Folders' }
+            ],
+            music: [
+                { id: 3, name: 'Tags (Artist/Album/Title)' },
+                { id: 0, name: 'Filename' },
+                { id: 1, name: 'Filename - Fields' },
+                { id: 5, name: 'Contents' }
+            ],
+            picture: [
+                { id: 10, name: 'Fuzzy Block (Visual)' },
+                { id: 11, name: 'EXIF Timestamp' }
+            ]
         };
 
         const elements = {
@@ -320,6 +350,11 @@
             duplicateCountText: document.getElementById('duplicateCountText'),
             thresholdSlider: document.getElementById('thresholdSlider'),
             thresholdVal: document.getElementById('thresholdVal'),
+            similarityContainer: document.getElementById('similarityContainer'),
+            algorithmSelect: document.getElementById('algorithmSelect'),
+            modeStandardBtn: document.getElementById('modeStandardBtn'),
+            modeMusicBtn: document.getElementById('modeMusicBtn'),
+            modePictureBtn: document.getElementById('modePictureBtn'),
             folderCountLabel: document.getElementById('folderCountLabel'),
             deleteSelectedBtn: document.getElementById('deleteSelectedBtn'),
             deleteSeparator: document.getElementById('deleteSeparator'),
@@ -425,7 +460,15 @@
             updateUIForScanning(true);
             
             try {
-                const res = await fetch('/api/scan', { method: 'POST' });
+                const res = await fetch('/api/scan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    mode: state.activeMode,
+                    algorithm: state.activeAlgorithm,
+                    threshold: parseInt(elements.thresholdSlider.value)
+                })
+            });
                 const data = await res.json();
                 
                 if (data.status === 'success') {
@@ -636,7 +679,55 @@
             }
         }
 
-        // Action Handlers
+        function updateAlgorithmOptions() {
+            const options = algorithms[state.activeMode];
+            elements.algorithmSelect.innerHTML = options.map(opt => 
+                `<option value="${opt.id}" ${opt.id === state.activeAlgorithm ? 'selected' : ''}>${opt.name}</option>`
+            ).join('');
+            
+            checkAlgorithmType();
+        }
+
+        function checkAlgorithmType() {
+            const alg = parseInt(elements.algorithmSelect.value);
+            state.activeAlgorithm = alg;
+            
+            // Logic for showing similarity slider
+            // FUZZYBLOCK (10), FILENAME (0), FIELDS (1), FIELDSNOORDER (2), TAG (3) all use threshold/logic
+            // CONTENTS (5) and EXIF (11) are typically near-binary or fixed matches
+            const needsThreshold = [10, 0, 1, 2, 3].includes(alg);
+            elements.similarityContainer.classList.toggle('hidden', !needsThreshold);
+        }
+
+        function setMode(mode) {
+            state.activeMode = mode;
+            
+            // Update UI Sidebar Buttons
+            [elements.modeStandardBtn, elements.modeMusicBtn, elements.modePictureBtn].forEach(btn => {
+                btn.classList.remove('bg-blue-500/10', 'text-blue-400', 'border', 'border-blue-500/20', 'shadow-lg', 'shadow-blue-500/5');
+                btn.classList.add('hover:bg-white/5', 'text-slate-400');
+            });
+
+            const activeBtn = mode === 'standard' ? elements.modeStandardBtn : 
+                              mode === 'music' ? elements.modeMusicBtn : elements.modePictureBtn;
+            
+            activeBtn.classList.add('bg-blue-500/10', 'text-blue-400', 'border', 'border-blue-500/20', 'shadow-lg', 'shadow-blue-500/5');
+            activeBtn.classList.remove('hover:bg-white/5', 'text-slate-400');
+
+            // Reset default algorithm for mode
+            if (mode === 'standard') state.activeAlgorithm = 5; // Contents
+            else if (mode === 'music') state.activeAlgorithm = 3; // Tags
+            else state.activeAlgorithm = 10; // Fuzzy Block
+
+            updateAlgorithmOptions();
+        }
+
+        elements.modeStandardBtn.addEventListener('click', () => setMode('standard'));
+        elements.modeMusicBtn.addEventListener('click', () => setMode('music'));
+        elements.modePictureBtn.addEventListener('click', () => setMode('picture'));
+        elements.algorithmSelect.addEventListener('change', checkAlgorithmType);
+
+        // UI Event Listeners
         elements.exportExcelBtn.addEventListener('click', exportResults);
         elements.browseBtn.addEventListener('click', browseNative);
         elements.folderPathInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') addFolder(); });
@@ -664,8 +755,9 @@
             }, 3000);
         }
 
-        // Initial Load
+        // Init
         fetchFolders();
+        setMode('picture'); // Start in Picture mode by default
     </script>
 </body>
 </html>
