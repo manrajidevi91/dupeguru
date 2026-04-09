@@ -7,7 +7,7 @@
 import logging
 from PIL import Image
 from hscommon.util import get_file_ext, format_size
-from core.pe._block import getblocks2
+from core.pe.block import getblocks2
 
 from core.util import format_timestamp, format_perc, format_dupe_count
 from core import fs
@@ -16,7 +16,7 @@ from core.pe import exif
 class Photo(fs.File):
     INITIAL_INFO = fs.File.INITIAL_INFO.copy()
     INITIAL_INFO.update({"dimensions": (0, 0), "exif_timestamp": ""})
-    __slots__ = fs.File.__slots__ + tuple(INITIAL_INFO.keys())
+    __slots__ = fs.File.__slots__ + tuple(INITIAL_INFO.keys()) + ("_cached_orientation", "cache_id")
 
     # These extensions are supported on all platforms
     HANDLED_EXTS = {"png", "jpg", "jpeg", "gif", "bmp", "tiff", "tif", "webp"}
