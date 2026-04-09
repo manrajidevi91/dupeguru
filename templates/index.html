@@ -254,8 +254,8 @@
                             <span class="material-symbols-rounded text-lg">done_all</span>
                             Select All
                         </button>
-                        <div class="w-px h-4 bg-white/5 self-center mx-1"></div>
-                        <button id="deleteSelectedBtn" class="flex items-center gap-2 px-5 py-2.5 bg-red-500 text-white hover:bg-red-600 rounded-xl text-xs font-bold shadow-lg shadow-red-500/20 transition-all active:scale-95">
+                        <div id="deleteSeparator" class="w-px h-4 bg-white/5 self-center mx-1 hidden"></div>
+                        <button id="deleteSelectedBtn" class="flex items-center gap-2 px-5 py-2.5 bg-red-500 text-white hover:bg-red-600 rounded-xl text-xs font-bold shadow-lg shadow-red-500/20 transition-all active:scale-95 hidden">
                             <span class="material-symbols-rounded text-lg">delete</span>
                             Trash Selected
                         </button>
@@ -303,7 +303,8 @@
         const state = {
             folders: [],
             results: [],
-            scanning: false
+            scanning: false,
+            reportGenerated: false
         };
 
         const elements = {
@@ -321,6 +322,7 @@
             thresholdVal: document.getElementById('thresholdVal'),
             folderCountLabel: document.getElementById('folderCountLabel'),
             deleteSelectedBtn: document.getElementById('deleteSelectedBtn'),
+            deleteSeparator: document.getElementById('deleteSeparator'),
             markSelectedBtn: document.getElementById('markSelectedBtn'),
             exportExcelBtn: document.getElementById('exportExcelBtn')
         };
@@ -444,6 +446,9 @@
         function updateUIForScanning(isScanning) {
             elements.startScanBtn.disabled = isScanning;
             if (isScanning) {
+                state.reportGenerated = false;
+                elements.deleteSelectedBtn.classList.add('hidden');
+                elements.deleteSeparator.classList.add('hidden');
                 elements.startScanBtn.innerHTML = `<span class="material-symbols-rounded animate-spin">progress_activity</span> <span class="tracking-widest">ANALYZING...</span>`;
                 elements.statusText.textContent = 'Scanning Environment...';
                 elements.statusDot.classList.replace('bg-emerald-500', 'bg-blue-500');
@@ -619,6 +624,9 @@
                     document.body.appendChild(a);
                     a.click();
                     a.remove();
+                    state.reportGenerated = true;
+                    elements.deleteSelectedBtn.classList.remove('hidden');
+                    elements.deleteSeparator.classList.remove('hidden');
                     showNotification('Report generated successfully');
                 } else {
                     showNotification('Failed to generate report', 'error');
