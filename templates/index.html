@@ -121,6 +121,16 @@
         input:focus {
             box-shadow: 0 0 15px rgba(59, 130, 246, 0.1);
         }
+
+        /* Explorer Modal Styles */
+        .modal-backdrop {
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(8px);
+        }
+        .explorer-item:hover {
+            background: rgba(59, 130, 246, 0.1);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
     </style>
 </head>
 <body class="text-slate-200">
@@ -170,13 +180,20 @@
                         <span id="folderCountLabel" class="text-[10px] text-blue-500 font-bold bg-blue-500/10 px-2 py-0.5 rounded-full">0</span>
                     </div>
                     
-                    <div class="relative mb-4 group">
+                    <div class="relative group">
                         <input type="text" id="folderPathInput" placeholder="Enter path (e.g. C:\Images)" 
-                            class="w-full bg-slate-900/50 border border-white/5 rounded-2xl py-3.5 pl-4 pr-12 text-sm focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-slate-600"/>
-                        <button id="addFolderBtn" class="absolute right-2 top-2 w-9 h-9 flex items-center justify-center rounded-xl bg-blue-500 text-white hover:bg-blue-600 transition-colors shadow-lg shadow-blue-500/20">
-                            <span class="material-symbols-rounded text-xl">add</span>
-                        </button>
+                            class="w-full bg-slate-900/50 border border-white/5 rounded-2xl py-3.5 pl-4 pr-16 text-sm focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all placeholder:text-slate-600"/>
+                        <div class="absolute right-2 top-2 flex items-center">
+                            <button id="browseBtn" title="Browse Folder" class="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-all border border-white/5">
+                                <span class="material-symbols-rounded text-xl">folder_open</span>
+                            </button>
+                        </div>
                     </div>
+
+                    <button id="addFolderBtn" class="w-full mt-4 flex items-center justify-center gap-2 py-3 rounded-2xl bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-all font-bold text-sm">
+                        <span class="material-symbols-rounded text-xl">add_circle</span>
+                        ADD DIRECTORY
+                    </button>
 
                     <div id="foldersList" class="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
                         <!-- Folders injected here -->
@@ -283,6 +300,7 @@
     </div>
 
     <!-- Scripts -->
+
     <script>
         const state = {
             folders: [],
@@ -293,6 +311,7 @@
         const elements = {
             folderPathInput: document.getElementById('folderPathInput'),
             addFolderBtn: document.getElementById('addFolderBtn'),
+            browseBtn: document.getElementById('browseBtn'),
             foldersList: document.getElementById('foldersList'),
             startScanBtn: document.getElementById('startScanBtn'),
             resultsGrid: document.getElementById('resultsGrid'),
@@ -307,6 +326,19 @@
             deleteSelectedBtn: document.getElementById('deleteSelectedBtn'),
             markSelectedBtn: document.getElementById('markSelectedBtn')
         };
+
+        async function browseNative() {
+            try {
+                const res = await fetch('/api/browse_os');
+                const data = await res.json();
+                if (data.status === 'success') {
+                    elements.folderPathInput.value = data.path;
+                    addFolder();
+                }
+            } catch (e) {
+                showNotification('Failed to open folder picker', 'error');
+            }
+        }
 
         // Threshold slider dynamic update
         elements.thresholdSlider.addEventListener('input', (e) => {
@@ -446,7 +478,7 @@
                 const data = await res.json();
                 
                 if (data.status === 'success') {
-                    showNotification(`Recycled ${data.deleted} items`);
+                    showNotification(`Recycle bin successfully populated with ${data.deleted} items`);
                     startScan(); // Refresh
                 } else {
                     alert('Error during deletion operation');
@@ -550,6 +582,7 @@
         }
 
         // Action Handlers
+        elements.browseBtn.addEventListener('click', browseNative);
         elements.addFolderBtn.addEventListener('click', addFolder);
         elements.folderPathInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') addFolder(); });
         elements.startScanBtn.addEventListener('click', startScan);

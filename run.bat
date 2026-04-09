@@ -37,12 +37,12 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-:: Run dupeGuru Flask Web App
-echo [dupeGuru] Starting web application on http://localhost:5010...
-python app.py
+:: Run dupeGuru Flask Web App with Custom Watcher
+echo [dupeGuru] Starting web application with watcher.py...
+python watcher.py
 
 if %errorlevel% neq 0 (
-    echo [ERROR] dupeGuru exited with code %errorlevel%.
+    echo [ERROR] dupeGuru watcher exited with code %errorlevel%.
     pause
 )
 

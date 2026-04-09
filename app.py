@@ -13,6 +13,24 @@ from core.pe.photo import PhotoFile
 
 app = Flask(__name__)
 
+@app.route('/api/browse_os', methods=['GET'])
+def browse_os_directory():
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes('-topmost', True)
+        folder_path = filedialog.askdirectory(parent=root, title="Select Folder for dupeGuru")
+        root.destroy()
+        
+        if folder_path:
+            return jsonify({"status": "success", "path": os.path.abspath(folder_path)})
+        return jsonify({"status": "cancel"})
+    except Exception as e:
+        logger.error(f"Error opening native browse: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
